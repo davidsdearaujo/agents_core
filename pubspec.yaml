@@ -3,7 +3,7 @@ description: >-
   A Dart library for orchestrating multi-agent AI workflows with
   LM Studio integration. Create agents, manage conversations, execute
   Python in Docker, and coordinate multi-step pipelines.
-version: 0.1.0
+version: 0.1.1
 repository: https://github.com/davidsdearaujo/agents_core
 
 environment:

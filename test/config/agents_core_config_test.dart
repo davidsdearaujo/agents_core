@@ -49,6 +49,11 @@ void main() {
         expect(config.workspacePath, isA<String>());
         expect(config.workspacePath, isNotEmpty);
       });
+
+      test('default apiKey is null', () {
+        final config = AgentsCoreConfig();
+        expect(config.apiKey, isNull);
+      });
     });
 
     // ------------------------------------------------------------------ //
@@ -138,12 +143,39 @@ void main() {
         expect(config.workspacePath, equals(path));
       });
 
+      test('apiKey can be set via constructor', () {
+        const key = 'my-secret-api-key';
+        final config = AgentsCoreConfig(apiKey: key);
+        expect(config.apiKey, equals(key));
+      });
+
+      test('apiKey accepts an empty string', () {
+        final config = AgentsCoreConfig(apiKey: '');
+        expect(config.apiKey, equals(''));
+        expect(config.apiKey, isNotNull);
+      });
+
+      test('apiKey is null when not provided', () {
+        final config = AgentsCoreConfig(
+          defaultModel: 'some-model',
+          dockerImage: 'python:3.12-slim',
+        );
+        expect(config.apiKey, isNull);
+      });
+
+      test('apiKey preserves the exact value provided', () {
+        const key = 'sk-abc123XYZ!@#\$%^&*()';
+        final config = AgentsCoreConfig(apiKey: key);
+        expect(config.apiKey, equals(key));
+      });
+
       test('all fields can be set together', () {
         final url = Uri.parse('http://10.0.0.1:1234');
         const model = 'qwen2-7b';
         const timeout = Duration(seconds: 30);
         const image = 'python:3.12-slim';
         const path = '/tmp/my_workspace';
+        const key = 'all-fields-api-key';
 
         final config = AgentsCoreConfig(
           lmStudioBaseUrl: url,
@@ -151,6 +183,7 @@ void main() {
           requestTimeout: timeout,
           dockerImage: image,
           workspacePath: path,
+          apiKey: key,
           logger: const SilentLogger(),
         );
 
@@ -159,6 +192,7 @@ void main() {
         expect(config.requestTimeout, equals(timeout));
         expect(config.dockerImage, equals(image));
         expect(config.workspacePath, equals(path));
+        expect(config.apiKey, equals(key));
         expect(config.logger, isA<SilentLogger>());
       });
     });
@@ -257,6 +291,43 @@ void main() {
         expect(copy.logger, isA<SilentLogger>());
       });
 
+      test('copyWith updates apiKey from null to a value', () {
+        final config = AgentsCoreConfig();
+        expect(config.apiKey, isNull);
+        final copy = config.copyWith(apiKey: 'new-key');
+        expect(copy.apiKey, equals('new-key'));
+      });
+
+      test('copyWith updates apiKey from one value to another', () {
+        final config = AgentsCoreConfig(apiKey: 'old-key');
+        final copy = config.copyWith(apiKey: 'new-key');
+        expect(copy.apiKey, equals('new-key'));
+      });
+
+      test('copyWith retains apiKey when not specified', () {
+        final config = AgentsCoreConfig(apiKey: 'retained-key');
+        final copy = config.copyWith(defaultModel: 'other-model');
+        expect(copy.apiKey, equals('retained-key'));
+      });
+
+      test('copyWith clearApiKey sets apiKey to null', () {
+        final config = AgentsCoreConfig(apiKey: 'will-be-cleared');
+        final copy = config.copyWith(clearApiKey: true);
+        expect(copy.apiKey, isNull);
+      });
+
+      test('copyWith clearApiKey ignores apiKey param when true', () {
+        final config = AgentsCoreConfig(apiKey: 'original');
+        final copy = config.copyWith(apiKey: 'ignored', clearApiKey: true);
+        expect(copy.apiKey, isNull);
+      });
+
+      test('copyWith clearApiKey false retains existing apiKey', () {
+        final config = AgentsCoreConfig(apiKey: 'kept');
+        final copy = config.copyWith(clearApiKey: false);
+        expect(copy.apiKey, equals('kept'));
+      });
+
       test('copyWith can update multiple fields at once', () {
         final config = AgentsCoreConfig();
         final copy = config.copyWith(
@@ -353,6 +424,28 @@ void main() {
         expect(config.workspacePath, equals('/env/workspace'));
       });
 
+      test('reads AGENTS_API_KEY from environment', () {
+        final config = AgentsCoreConfig.fromEnvironment(
+          environment: {'AGENTS_API_KEY': 'env-secret-key'},
+        );
+        expect(config.apiKey, equals('env-secret-key'));
+      });
+
+      test('apiKey is null when AGENTS_API_KEY is absent from environment', () {
+        final config = AgentsCoreConfig.fromEnvironment(
+          environment: {'AGENTS_DEFAULT_MODEL': 'some-model'},
+        );
+        expect(config.apiKey, isNull);
+      });
+
+      test('reads AGENTS_API_KEY as empty string when set to empty', () {
+        final config = AgentsCoreConfig.fromEnvironment(
+          environment: {'AGENTS_API_KEY': ''},
+        );
+        // Empty string is passed through — it's up to the caller to validate.
+        expect(config.apiKey, equals(''));
+      });
+
       test('reads AGENTS_REQUEST_TIMEOUT_SECONDS from environment', () {
         final config = AgentsCoreConfig.fromEnvironment(
           environment: {'AGENTS_REQUEST_TIMEOUT_SECONDS': '120'},
@@ -376,6 +469,7 @@ void main() {
             'AGENTS_DOCKER_IMAGE': 'python:3.12',
             'AGENTS_WORKSPACE_PATH': '/all/env/workspace',
             'AGENTS_REQUEST_TIMEOUT_SECONDS': '30',
+            'AGENTS_API_KEY': 'all-env-api-key',
           },
         );
         expect(
@@ -386,6 +480,7 @@ void main() {
         expect(config.dockerImage, equals('python:3.12'));
         expect(config.workspacePath, equals('/all/env/workspace'));
         expect(config.requestTimeout, equals(const Duration(seconds: 30)));
+        expect(config.apiKey, equals('all-env-api-key'));
       });
 
       test('can pass a logger alongside the environment map', () {
@@ -491,6 +586,30 @@ void main() {
         expect(a, isNot(equals(b)));
       });
 
+      test('two configs with same apiKey are equal', () {
+        final a = AgentsCoreConfig(apiKey: 'same-key');
+        final b = AgentsCoreConfig(apiKey: 'same-key');
+        expect(a, equals(b));
+      });
+
+      test('two configs differ when apiKey differs', () {
+        final a = AgentsCoreConfig(apiKey: 'key-a');
+        final b = AgentsCoreConfig(apiKey: 'key-b');
+        expect(a, isNot(equals(b)));
+      });
+
+      test('config with apiKey differs from config without apiKey', () {
+        final withKey = AgentsCoreConfig(apiKey: 'some-key');
+        final withoutKey = AgentsCoreConfig();
+        expect(withKey, isNot(equals(withoutKey)));
+      });
+
+      test('two configs with null apiKey are equal', () {
+        final a = AgentsCoreConfig();
+        final b = AgentsCoreConfig();
+        expect(a, equals(b));
+      });
+
       // hashCode
       test('equal configs have the same hashCode', () {
         final a = AgentsCoreConfig(
@@ -524,6 +643,18 @@ void main() {
         expect(a.hashCode, isNot(equals(b.hashCode)));
       });
 
+      test('configs with same apiKey have the same hashCode', () {
+        final a = AgentsCoreConfig(apiKey: 'hash-key');
+        final b = AgentsCoreConfig(apiKey: 'hash-key');
+        expect(a.hashCode, equals(b.hashCode));
+      });
+
+      test('configs with different apiKey usually have different hashCodes', () {
+        final a = AgentsCoreConfig(apiKey: 'hash-key-a');
+        final b = AgentsCoreConfig(apiKey: 'hash-key-b');
+        expect(a.hashCode, isNot(equals(b.hashCode)));
+      });
+
       // toString
       test('toString returns a non-empty string', () {
         final config = AgentsCoreConfig();
@@ -550,6 +681,24 @@ void main() {
       test('toString contains workspacePath value', () {
         final config = AgentsCoreConfig(workspacePath: '/visible/path');
         expect(config.toString(), contains('/visible/path'));
+      });
+
+      test('toString masks apiKey when present', () {
+        final config = AgentsCoreConfig(apiKey: 'super-secret-key');
+        final str = config.toString();
+        expect(str, contains('***'));
+        expect(str, isNot(contains('super-secret-key')));
+      });
+
+      test('toString shows null when apiKey is absent', () {
+        final config = AgentsCoreConfig();
+        final str = config.toString();
+        expect(str, contains('null'));
+      });
+
+      test('toString includes apiKey label', () {
+        final config = AgentsCoreConfig(apiKey: 'test-key');
+        expect(config.toString(), contains('apiKey'));
       });
     });
   });

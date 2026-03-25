@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.1 — 2026-03-25
+
+Add API_KEY to AgentsCoreConfig
+
+#### Configuration
+- Optional `apiKey` parameter on `AgentsCoreConfig` — sent as a `Bearer` token
+  in the `Authorization` header when the LM Studio server requires
+  authentication. Readable from `AGENTS_API_KEY` via `fromEnvironment()`.
+  Masked in `toString()` output to prevent accidental credential leakage.
+- `AgentsCoreConfig.copyWith()` supports `clearApiKey` to explicitly 
+  remove an API key.
+
 ## 0.1.0 — 2026-03-25
 
 First feature-complete release of `agents_core`.

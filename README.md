@@ -209,6 +209,7 @@ See the [`example/`](example/) directory for runnable examples:
 - [`simple_agent.dart`](example/simple_agent.dart) — SimpleAgent with FileContext
 - [`python_agent.dart`](example/python_agent.dart) — PythonToolAgent with Docker execution
 - [`multi_agent.dart`](example/multi_agent.dart) — Multi-agent orchestration pipeline
+- [`api_key_config.dart`](example/api_key_config.dart) — API key configuration (explicit, env var, copyWith)
 
 ## Configuration
 
@@ -221,6 +222,7 @@ See the [`example/`](example/) directory for runnable examples:
 | `requestTimeout` | `60 seconds` | HTTP connection timeout |
 | `dockerImage` | `python:3.12-slim` | Docker image for Python execution |
 | `workspacePath` | `/tmp/agents_workspace` | Default workspace path |
+| `apiKey` | `null` | Optional Bearer token for authenticated LM Studio requests |
 | `logger` | `StderrLogger(level: LogLevel.info)` | Logger instance |
 
 You can also create configuration from environment variables:
@@ -230,7 +232,34 @@ final config = AgentsCoreConfig.fromEnvironment();
 ```
 
 Supported environment variables: `LM_STUDIO_BASE_URL`, `AGENTS_DEFAULT_MODEL`,
-`AGENTS_DOCKER_IMAGE`, `AGENTS_WORKSPACE_PATH`, `AGENTS_REQUEST_TIMEOUT_SECONDS`.
+`AGENTS_DOCKER_IMAGE`, `AGENTS_WORKSPACE_PATH`, `AGENTS_REQUEST_TIMEOUT_SECONDS`,
+`AGENTS_API_KEY`.
+
+### Authentication
+
+When the LM Studio server is deployed behind an API gateway or reverse proxy
+that requires authentication, provide an `apiKey`. The key is sent as a `Bearer`
+token in the `Authorization` header of every outgoing HTTP request.
+
+```dart
+// Explicit API key
+final config = AgentsCoreConfig(
+  apiKey: 'my-secret-key',
+);
+
+// Or read from the AGENTS_API_KEY environment variable
+final config = AgentsCoreConfig.fromEnvironment();
+
+// Add or remove a key from an existing config
+final authenticated = config.copyWith(apiKey: 'new-key');
+final anonymous = config.copyWith(clearApiKey: true);
+```
+
+> **Tip:** For local development without authentication, omit the `apiKey`
+> parameter — it defaults to `null` and no `Authorization` header is sent.
+
+See [`example/api_key_config.dart`](example/api_key_config.dart) for a complete
+runnable example.
 
 ## License
 
