@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.2 — 2026-03-25
+### Improvements
+
+#### LM Studio Client
+- `LmStudioHttpClient` now correctly throws `LmStudioHttpException` for 4xx
+  client errors instead of misclassifying them — improves error handling for
+  authentication failures, not-found, and rate-limit responses.
+- Retry logic refined to only retry on transient (5xx/network) errors, not
+  client errors.
+
+#### Bug Fixes
+- Fixed flaky retry-related test expectations caused by timing sensitivity in
+  exponential backoff verification.
+
+
 ## 0.1.1 — 2026-03-25
 
 Add API_KEY to AgentsCoreConfig

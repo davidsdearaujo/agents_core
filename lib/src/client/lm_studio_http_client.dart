@@ -147,6 +147,11 @@ class LmStudioHttpClient {
       request.headers
           .set(HttpHeaders.contentTypeHeader, ContentType.json.value);
       request.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');
+      final key = _config.apiKey;
+      if (key != null) {
+        request.headers
+            .set(HttpHeaders.authorizationHeader, 'Bearer $key');
+      }
       request.write(json.encode(body));
 
       response = await request.close();
@@ -287,9 +292,16 @@ class LmStudioHttpClient {
   Uri _resolve(String path) => _config.lmStudioBaseUrl.resolve(path);
 
   /// Sets standard JSON request headers on [request].
+  ///
+  /// When [AgentsCoreConfig.apiKey] is non-null, an `Authorization: Bearer`
+  /// header is added for LM Studio server authentication.
   void _setJsonHeaders(HttpClientRequest request) {
     request.headers.set(HttpHeaders.contentTypeHeader, ContentType.json.value);
     request.headers.set(HttpHeaders.acceptHeader, ContentType.json.value);
+    final key = _config.apiKey;
+    if (key != null) {
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $key');
+    }
   }
 
   /// Decodes a JSON response [body], returning an empty map when the body
