@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 — 2026-03-26
+- Expand `README.md` with detailed `AgentLoop` usage and examples
+
+
 ## 0.2.0 — 2026-03-26
 
 ### Features

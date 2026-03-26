@@ -185,6 +185,120 @@ Future<void> main() async {
 }
 ```
 
+### Produce-review loop (AgentLoop)
+
+Run iterative refinement between a producer and a reviewer agent. The loop
+continues until the reviewer accepts the output or `maxIterations` is reached:
+
+```dart
+import 'dart:io';
+import 'package:agents_core/agents_core.dart';
+
+Future<void> main() async {
+  final config = AgentsCoreConfig();
+  final client = LmStudioClient(config);
+  final context = FileContext(
+    workspacePath: '${Directory.systemTemp.path}/loop_demo',
+  );
+
+  // Producer: generates work each iteration.
+  final developer = SimpleAgent(
+    name: 'developer',
+    client: client,
+    config: config,
+    model: 'llama-3-8b',
+    systemPrompt: 'You are a senior Dart developer. Write clean, idiomatic code. '
+        'When given review feedback, revise your code to address every issue.',
+  );
+
+  // Reviewer: evaluates the producer's output.
+  final qa = SimpleAgent(
+    name: 'qa-reviewer',
+    client: client,
+    config: config,
+    model: 'llama-3-8b',
+    systemPrompt: 'You are a strict code reviewer. '
+        'If the code meets all criteria, begin your response with "APPROVED". '
+        'Otherwise, list the issues that must be fixed.',
+  );
+
+  // Create the loop — runs up to 4 produce-review rounds.
+  final loop = AgentLoop(
+    context: context,
+    producer: developer,
+    reviewer: qa,
+    isAccepted: (AgentResult reviewerResult, int iteration) =>
+        reviewerResult.output.trim().toUpperCase().startsWith('APPROVED'),
+    maxIterations: 4,
+  );
+
+  // Run the loop with a task description.
+  final result = await loop.run(
+    'Write a Dart function `int fibonacci(int n)` that returns the n-th '
+    'Fibonacci number. Handle negative inputs by throwing an ArgumentError.',
+  );
+
+  // ── Inspect each iteration via AgentLoopIteration ──────────────────
+  for (final iteration in result.iterations) {
+    print('Iteration ${iteration.index}:');
+    print('  Producer tokens: ${iteration.producerResult.tokensUsed}');
+    print('  Reviewer tokens: ${iteration.reviewerResult.tokensUsed}');
+  }
+
+  // ── Read the overall AgentLoopResult ───────────────────────────────
+  print('Accepted:          ${result.accepted}');
+  print('Iterations:        ${result.iterationCount}');
+  print('Total tokens:      ${result.totalTokensUsed}');
+  print('Duration:          ${result.duration.inMilliseconds} ms');
+  print('Reached max iter:  ${result.reachedMaxIterations}');
+
+  // The final producer output is accessible directly:
+  print(result.lastProducerResult.output);
+
+  client.dispose();
+}
+```
+
+**How it works:**
+
+1. Each iteration, `AgentLoop` builds a prompt and runs the **producer** agent.
+2. The producer's output is forwarded to the **reviewer** agent for evaluation.
+3. The `isAccepted` callback inspects the reviewer's `AgentResult` and the
+   current iteration index — return `true` to accept and stop the loop.
+4. If the reviewer rejects, its feedback is automatically appended to the next
+   producer prompt so the producer can address the issues.
+5. The loop stops when `isAccepted` returns `true` or `maxIterations` is
+   reached (whichever comes first).
+
+**Custom prompt builders:** For advanced scenarios you can supply
+`buildProducerPrompt` and `buildReviewerPrompt` callbacks to control exactly
+what each agent receives:
+
+```dart
+final loop = AgentLoop(
+  context: context,
+  producer: developer,
+  reviewer: qa,
+  isAccepted: (result, _) => result.output.contains('APPROVED'),
+  buildProducerPrompt: (task, ctx, iteration, prevReview) async {
+    final files = ctx.listFiles();
+    return '$task\n\nWorkspace files: $files'
+        '${prevReview != null ? '\n\nFeedback: ${prevReview.output}' : ''}';
+  },
+  buildReviewerPrompt: (task, ctx, iteration, producerResult) async {
+    return 'Iteration $iteration — review:\n${producerResult.output}';
+  },
+);
+```
+
+**Key classes:**
+
+| Class | Purpose |
+|---|---|
+| `AgentLoop` | Orchestrates the produce-review cycle |
+| `AgentLoopIteration` | One iteration record with `index`, `producerResult`, and `reviewerResult` |
+| `AgentLoopResult` | Overall result — `accepted`, `iterationCount`, `totalTokensUsed`, `duration`, `reachedMaxIterations` |
+
 ## Module Overview
 
 | Module | Key Classes | Description |
@@ -195,6 +309,7 @@ Future<void> main() async {
 | **Config** | `AgentsCoreConfig`, `Logger`, `StderrLogger`, `SilentLogger` | Configuration and logging |
 | **File Context** | `FileContext`, `readFileTool`, `writeFileTool`, `listFilesTool`, `createHandlers` | Sandboxed file operations with tool definitions |
 | **Orchestrator** | `Orchestrator`, `AgentStep`, `OrchestratorResult`, `OrchestratorErrorPolicy` | Sequential multi-agent pipelines |
+| **AgentLoop** | `AgentLoop`, `AgentLoopIteration`, `AgentLoopResult` | Iterative produce-review refinement loop |
 | **Docker** | `DockerClient`, `DockerRunResult` | Container management for sandboxed execution |
 | **Python** | `PythonToolAgent`, `PythonExecutionTool` | Python code execution in Docker |
 | **Quick** | `ask`, `askStream`, `Conversation` | Convenience functions for common patterns |
@@ -209,6 +324,7 @@ See the [`example/`](example/) directory for runnable examples:
 - [`simple_agent.dart`](example/simple_agent.dart) — SimpleAgent with FileContext
 - [`python_agent.dart`](example/python_agent.dart) — PythonToolAgent with Docker execution
 - [`multi_agent.dart`](example/multi_agent.dart) — Multi-agent orchestration pipeline
+- [`agent_loop.dart`](example/agent_loop.dart) — Produce-review loop with AgentLoop
 - [`api_key_config.dart`](example/api_key_config.dart) — API key configuration (explicit, env var, copyWith)
 
 ## Configuration
