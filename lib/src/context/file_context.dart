@@ -139,18 +139,24 @@ class FileContext {
 
   /// Resolves [fileName] to an absolute [File] within the workspace.
   ///
-  /// The path is normalized via [Uri.normalizePath] to collapse `.` and `..`
-  /// segments **before** the prefix check, preventing traversal attacks that
-  /// embed `..` after a valid directory name (e.g. `a/../../etc/passwd`).
+  /// The path is normalized via [Uri.file] + [Uri.normalizePath] to collapse
+  /// `.` and `..` segments **before** the prefix check, preventing traversal
+  /// attacks that embed `..` after a valid directory name
+  /// (e.g. `a/../../etc/passwd`).
+  ///
+  /// [Uri.file] is used instead of [Uri.parse] to correctly handle file-system
+  /// paths that contain spaces or other characters that [Uri.parse] would
+  /// percent-encode.
   ///
   /// Throws [PathTraversalException] if the resolved path escapes the root.
   File _resolve(String fileName) {
     final rootAbsolute = _root.absolute.path;
 
     // Build the joined path and normalize it to resolve . and .. segments.
-    final joined =
-        '$rootAbsolute${Platform.pathSeparator}$fileName';
-    final normalized = Uri.parse(joined).normalizePath().path;
+    // Uri.file correctly round-trips file-system paths (including spaces)
+    // without introducing percent-encoding artifacts.
+    final joined = '$rootAbsolute${Platform.pathSeparator}$fileName';
+    final normalized = Uri.file(joined).normalizePath().toFilePath();
 
     // Build the canonical root prefix (with trailing separator).
     final rootPrefix = rootAbsolute.endsWith(Platform.pathSeparator)

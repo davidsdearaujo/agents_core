@@ -175,6 +175,118 @@ void main() {
         expect(() => ctx.write('a/b/c.txt', 'ok'), returnsNormally);
         expect(() => ctx.write('deep/nested/dir/file.txt', 'ok'), returnsNormally);
       });
+
+      // ───────────────────────────────────────────────────────────────────────
+      // Regression: relative filenames must resolve to workspace root
+      // (Prevents recurrence of bug where simple names were mishandled)
+      // ───────────────────────────────────────────────────────────────────────
+      group('relative filenames (regression)', () {
+        test('simple filename writes to workspace root', () {
+          ctx.write('research_outline.md', '# Research');
+          final file = File('${dir.path}/research_outline.md');
+          expect(file.existsSync(), isTrue,
+              reason: 'simple filename should land in workspace root');
+          expect(file.readAsStringSync(), equals('# Research'));
+        });
+
+        test('simple filename is readable via read()', () {
+          ctx.write('research_outline.md', '# Outline');
+          expect(ctx.read('research_outline.md'), equals('# Outline'));
+        });
+
+        test('simple filename shows up in exists()', () {
+          ctx.write('notes.txt', 'content');
+          expect(ctx.exists('notes.txt'), isTrue);
+        });
+
+        test('simple filename appears in listFiles()', () {
+          ctx.write('research_outline.md', 'data');
+          expect(ctx.listFiles(), contains('research_outline.md'));
+        });
+
+        test('single-level subdirectory path works', () {
+          ctx.write('docs/file.txt', 'documentation');
+          final file = File('${dir.path}/docs/file.txt');
+          expect(file.existsSync(), isTrue);
+          expect(file.readAsStringSync(), equals('documentation'));
+        });
+
+        test('single-level subdirectory path is readable via read()', () {
+          ctx.write('docs/file.txt', 'docs content');
+          expect(ctx.read('docs/file.txt'), equals('docs content'));
+        });
+
+        test('dot-prefixed filename in root', () {
+          ctx.write('.gitignore', 'node_modules/');
+          expect(ctx.read('.gitignore'), equals('node_modules/'));
+        });
+
+        test('filename with spaces', () {
+          ctx.write('my notes.txt', 'spaced');
+          expect(ctx.read('my notes.txt'), equals('spaced'));
+        });
+
+        test('filename with multiple dots', () {
+          ctx.write('archive.tar.gz', 'data');
+          expect(ctx.exists('archive.tar.gz'), isTrue);
+        });
+
+        test('various typical filenames all resolve inside workspace', () {
+          final filenames = [
+            'README.md',
+            'src/main.dart',
+            'test/widget_test.dart',
+            'lib/src/utils/helper.dart',
+            'config.yaml',
+            '.env.example',
+          ];
+          for (final name in filenames) {
+            ctx.write(name, 'content of $name');
+            expect(ctx.exists(name), isTrue,
+                reason: '"$name" should exist after write');
+            expect(ctx.read(name), equals('content of $name'),
+                reason: '"$name" should round-trip correctly');
+          }
+        });
+
+        test('dot-slash prefix resolves to workspace root', () {
+          // './file.txt' should be treated the same as 'file.txt'
+          ctx.write('./report.md', 'report content');
+          expect(ctx.exists('report.md'), isTrue,
+              reason: '"./report.md" should resolve to "report.md" in root');
+        });
+      });
+
+      // ───────────────────────────────────────────────────────────────────────
+      // Absolute paths are sandboxed (resolved inside workspace)
+      // ───────────────────────────────────────────────────────────────────────
+      group('absolute paths are sandboxed', () {
+        test('absolute path resolves inside workspace (no escape)', () {
+          // '/etc/passwd' becomes '<workspace>/etc/passwd' — safe, no throw
+          ctx.write('/etc/passwd', 'sandboxed');
+          expect(ctx.exists('/etc/passwd'), isTrue);
+          expect(ctx.read('/etc/passwd'), equals('sandboxed'));
+        });
+
+        test('absolute path does NOT write to the real filesystem location', () {
+          ctx.write('/tmp/agents_core_abs_test_canary.txt', 'sandboxed');
+          // The real /tmp file must not be created — only workspace-relative
+          expect(
+            File('/tmp/agents_core_abs_test_canary.txt').existsSync(),
+            isFalse,
+            reason: 'absolute path must not create file outside workspace',
+          );
+          // Clean up workspace-relative file
+          ctx.delete('/tmp/agents_core_abs_test_canary.txt');
+        });
+
+        test('absolute path file appears in listFiles()', () {
+          ctx.write('/docs/notes.md', 'content');
+          final files = ctx.listFiles();
+          expect(files.any((f) => f.contains('notes.md')), isTrue,
+              reason: 'file from absolute path should appear in listing');
+        });
+      });
     });
 
     // ─────────────────────────────────────────────────────────────────────────

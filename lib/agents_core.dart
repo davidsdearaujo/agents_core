@@ -33,6 +33,7 @@ export 'src/models/completion_usage.dart';
 export 'src/models/lm_model.dart';
 export 'src/models/tool_call.dart';
 export 'src/models/tool_definition.dart';
+export 'src/orchestrator/agent_loop.dart';
 export 'src/orchestrator/orchestrator.dart';
 export 'src/python/file_context_tools.dart';
 export 'src/python/python_execution_tool.dart';

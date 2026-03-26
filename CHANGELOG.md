@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.0 — 2026-03-26
+
+### Features
+
+#### Agent Loop
+- `AgentLoop` — producer/reviewer orchestration loop that iterates a producer
+  agent and a reviewer agent until an approval pattern is matched or
+  `maxIterations` is reached.
+- `AgentLoopIteration` — immutable record of a single loop iteration capturing
+  `index`, `producerResult`, and `reviewerResult`.
+- `AgentLoopResult` — aggregated result with `iterations`, `approved` flag,
+  total `duration`, and combined `errors`.
+- New `example/agent_loop.dart` demonstrating a developer + QA review loop.
+
+### Bug Fixes
+
+#### File Context
+- Fixed `FileContext._resolve` to use `Uri.file` instead of `Uri.parse` so that
+  workspace paths containing spaces are handled correctly without
+  percent-encoding artifacts.
+
 ## 0.1.2 — 2026-03-25
 ### Improvements
 
