@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.1 — 2026-03-26
+
+### Bug Fixes
+
+#### LM Studio Client
+- Fixed HTTP request body encoding in `LmStudioHttpClient` — replaced
+  `request.write()` with `request.add(utf8.encode(...))` in both `postStream`
+  and the internal `_sendRequest` helper. The previous implementation could
+  corrupt non-ASCII characters (e.g. Unicode prompts) because `write()` uses
+  the platform default encoding, which is not guaranteed to be UTF-8.
+
 ## 0.3.0 — 2026-03-26
 
 Previously, orchestrator pipelines only supported single-agent steps, forcing

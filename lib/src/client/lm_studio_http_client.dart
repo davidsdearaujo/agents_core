@@ -63,16 +63,18 @@ class LmStudioHttpClient {
       String method,
       Uri url, {
       String? body,
-    })? httpSend,
+    })?
+    httpSend,
     Future<void> Function(Duration)? delay,
-  })  : _config = config ??
-            AgentsCoreConfig(
-              lmStudioBaseUrl: baseUrl != null ? Uri.parse(baseUrl) : null,
-            ),
-        _maxRetries = maxRetries,
-        _httpSend = httpSend,
-        _delayFn = delay ?? Future.delayed,
-        _client = HttpClient() {
+  }) : _config =
+           config ??
+           AgentsCoreConfig(
+             lmStudioBaseUrl: baseUrl != null ? Uri.parse(baseUrl) : null,
+           ),
+       _maxRetries = maxRetries,
+       _httpSend = httpSend,
+       _delayFn = delay ?? Future.delayed,
+       _client = HttpClient() {
     _client.connectionTimeout = _config.requestTimeout;
   }
 
@@ -83,7 +85,8 @@ class LmStudioHttpClient {
     String method,
     Uri url, {
     String? body,
-  })? _httpSend;
+  })?
+  _httpSend;
   final Future<void> Function(Duration) _delayFn;
 
   /// Sends an HTTP GET request to [path] and returns the decoded JSON body.
@@ -112,10 +115,7 @@ class LmStudioHttpClient {
   /// Throws [LmStudioApiException] immediately for any non-2xx HTTP response.
   /// Throws [LmStudioConnectionException] if a network error persists after
   /// all retries.
-  Future<Map<String, dynamic>> post(
-    String path,
-    Map<String, dynamic> body,
-  ) =>
+  Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body) =>
       _executeWithRetry('POST', path, requestBody: body);
 
   /// Sends an HTTP POST request to [path] with a JSON [body] and returns
@@ -133,10 +133,7 @@ class LmStudioHttpClient {
   ///
   /// Throws [LmStudioApiException] if the initial response status is
   /// not 2xx.
-  Stream<String> postStream(
-    String path,
-    Map<String, dynamic> body,
-  ) async* {
+  Stream<String> postStream(String path, Map<String, dynamic> body) async* {
     final uri = _resolve(path);
     _config.logger.debug('POST (stream) $uri');
 
@@ -144,15 +141,16 @@ class LmStudioHttpClient {
 
     try {
       final request = await _client.postUrl(uri);
-      request.headers
-          .set(HttpHeaders.contentTypeHeader, ContentType.json.value);
+      request.headers.set(
+        HttpHeaders.contentTypeHeader,
+        ContentType.json.value,
+      );
       request.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');
       final key = _config.apiKey;
       if (key != null) {
-        request.headers
-            .set(HttpHeaders.authorizationHeader, 'Bearer $key');
+        request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $key');
       }
-      request.write(json.encode(body));
+      request.add(utf8.encode(json.encode(body)));
 
       response = await request.close();
     } on SocketException catch (e) {
@@ -206,15 +204,13 @@ class LmStudioHttpClient {
     final uri = _resolve(path);
     _config.logger.debug('$method $uri');
 
-    final encodedBody =
-        requestBody != null ? json.encode(requestBody) : null;
+    final encodedBody = requestBody != null ? json.encode(requestBody) : null;
 
     Object? lastError;
 
     for (var attempt = 0; attempt <= _maxRetries; attempt++) {
       try {
-        final response =
-            await _sendRequest(method, uri, body: encodedBody);
+        final response = await _sendRequest(method, uri, body: encodedBody);
 
         if (response.statusCode >= 200 && response.statusCode < 300) {
           return _decodeJsonBody(response.body);
@@ -280,7 +276,7 @@ class LmStudioHttpClient {
     }
 
     _setJsonHeaders(request);
-    if (body != null) request.write(body);
+    if (body != null) request.add(utf8.encode(body));
 
     final response = await request.close();
     final responseBody = await response.transform(utf8.decoder).join();
