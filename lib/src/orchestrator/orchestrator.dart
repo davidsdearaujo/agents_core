@@ -1,8 +1,10 @@
 // ignore_for_file: prefer_initializing_formals
 
 import '../agent/agent.dart';
-import '../agent/agent_result.dart';
 import '../context/file_context.dart';
+import 'agent_loop.dart';
+import 'orchestrator_step.dart';
+import 'step_result.dart';
 
 /// Policy that controls how the [Orchestrator] handles step failures.
 ///
@@ -37,7 +39,7 @@ enum OrchestratorErrorPolicy {
 ///   taskPrompt: (ctx) async => 'Process: ${ctx.read("input.txt")}',
 /// );
 /// ```
-class AgentStep {
+class AgentStep extends OrchestratorStep {
   /// Creates an [AgentStep] with a static [String] task prompt.
   ///
   /// [agent] is the agent that will execute this step.
@@ -70,18 +72,20 @@ class AgentStep {
 
   /// The task prompt — either a [String] or a
   /// `Future<String> Function(FileContext)` that is awaited at runtime.
+  @override
   final Object taskPrompt;
 
   /// An optional guard condition evaluated before the step runs.
   ///
   /// When `null`, the step always executes. When provided, the step is
   /// skipped if the function returns `false`.
+  @override
   final Future<bool> Function(FileContext)? condition;
 }
 
 /// The result of an [Orchestrator.run] invocation.
 ///
-/// Contains the [AgentResult] from each successfully executed step, the
+/// Contains the [StepResult] from each successfully executed step, the
 /// total [duration] of the run, and any [errors] captured when using
 /// [OrchestratorErrorPolicy.continueOnError].
 ///
@@ -99,12 +103,14 @@ class OrchestratorResult {
     this.errors = const [],
   });
 
-  /// The [AgentResult] from each successfully executed step, in execution
+  /// The [StepResult] from each successfully executed step, in execution
   /// order.
   ///
-  /// Skipped steps (condition returned `false`) and failed steps (when using
+  /// Each entry is either an [AgentStepResult] (from an [AgentStep]) or an
+  /// [AgentLoopStepResult] (from an [AgentLoopStep]). Skipped steps
+  /// (condition returned `false`) and failed steps (when using
   /// [OrchestratorErrorPolicy.continueOnError]) are **not** included.
-  final List<AgentResult> stepResults;
+  final List<StepResult> stepResults;
 
   /// The wall-clock duration of the entire [Orchestrator.run] call.
   final Duration duration;
@@ -120,11 +126,12 @@ class OrchestratorResult {
   bool get hasErrors => errors.isNotEmpty;
 }
 
-/// Sequences agent execution through a pipeline of [AgentStep]s.
+/// Sequences execution through a pipeline of [OrchestratorStep]s.
 ///
 /// The [Orchestrator] iterates through [steps] in order, evaluating each
-/// step's optional [AgentStep.condition], resolving dynamic prompts, and
-/// collecting results.
+/// step's optional [OrchestratorStep.condition], resolving dynamic prompts,
+/// and collecting results. Steps can be [AgentStep]s (single agent) or
+/// [AgentLoopStep]s (produce-review loops).
 ///
 /// Error handling is controlled by [onError]:
 /// - [OrchestratorErrorPolicy.stop] (default) — rethrow on first failure.
@@ -136,6 +143,12 @@ class OrchestratorResult {
 ///   steps: [
 ///     AgentStep(agent: researcher, taskPrompt: 'Research topic X'),
 ///     AgentStep(agent: writer, taskPrompt: 'Write summary'),
+///     AgentLoopStep(
+///       producer: devAgent,
+///       reviewer: qaAgent,
+///       isAccepted: (r, i) => r.output.contains('APPROVED'),
+///       taskPrompt: 'Implement feature Y',
+///     ),
 ///   ],
 /// );
 /// final result = await orch.run();
@@ -146,7 +159,8 @@ class Orchestrator {
   /// [context] is the shared [FileContext] passed to every step's agent
   /// and available to conditions and dynamic prompts.
   ///
-  /// [steps] defines the pipeline of agent invocations to execute.
+  /// [steps] defines the pipeline of [OrchestratorStep]s to execute.
+  /// Each step can be an [AgentStep] or an [AgentLoopStep].
   ///
   /// [onError] controls failure behaviour. Defaults to
   /// [OrchestratorErrorPolicy.stop].
@@ -160,7 +174,7 @@ class Orchestrator {
   final FileContext context;
 
   /// The ordered list of steps to execute.
-  final List<AgentStep> steps;
+  final List<OrchestratorStep> steps;
 
   /// The error-handling policy for step failures.
   final OrchestratorErrorPolicy onError;
@@ -168,12 +182,15 @@ class Orchestrator {
   /// Executes all [steps] sequentially and returns an [OrchestratorResult].
   ///
   /// For each step:
-  /// 1. If [AgentStep.condition] is non-null, await it; skip the step when
-  ///    it returns `false`.
+  /// 1. If [OrchestratorStep.condition] is non-null, await it; skip the step
+  ///    when it returns `false`.
   /// 2. Resolve the task prompt — use as-is for [String], or await the
   ///    function for dynamic prompts.
-  /// 3. Call [Agent.run] with the resolved prompt and [context].
-  /// 4. On success, add the [AgentResult] to `stepResults`.
+  /// 3. Execute the step based on its concrete type:
+  ///    - [AgentStep]: call [Agent.run] and wrap in [AgentStepResult].
+  ///    - [AgentLoopStep]: create an [AgentLoop], call its `run`, and wrap
+  ///      in [AgentLoopStepResult].
+  /// 4. On success, add the [StepResult] to `stepResults`.
   /// 5. On failure, either rethrow ([OrchestratorErrorPolicy.stop]) or
   ///    capture the error and continue
   ///    ([OrchestratorErrorPolicy.continueOnError]).
@@ -182,7 +199,7 @@ class Orchestrator {
   /// time of the entire run.
   Future<OrchestratorResult> run() async {
     final stopwatch = Stopwatch()..start();
-    final stepResults = <AgentResult>[];
+    final stepResults = <StepResult>[];
     final errors = <Object>[];
 
     for (final step in steps) {
@@ -202,10 +219,25 @@ class Orchestrator {
             await (prompt as Future<String> Function(FileContext))(context);
       }
 
-      // 3. Execute the agent.
+      // 3. Execute based on step type.
       try {
-        final result = await step.agent.run(resolvedPrompt, context: context);
-        stepResults.add(result);
+        if (step is AgentStep) {
+          final result =
+              await step.agent.run(resolvedPrompt, context: context);
+          stepResults.add(AgentStepResult(agentResult: result));
+        } else if (step is AgentLoopStep) {
+          final loop = AgentLoop(
+            context: context,
+            producer: step.producer,
+            reviewer: step.reviewer,
+            isAccepted: step.isAccepted,
+            maxIterations: step.maxIterations,
+            buildProducerPrompt: step.buildProducerPrompt,
+            buildReviewerPrompt: step.buildReviewerPrompt,
+          );
+          final result = await loop.run(resolvedPrompt);
+          stepResults.add(AgentLoopStepResult(agentLoopResult: result));
+        }
       } catch (e) {
         if (onError == OrchestratorErrorPolicy.stop) rethrow;
         errors.add(e);

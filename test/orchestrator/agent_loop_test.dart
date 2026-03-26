@@ -1695,11 +1695,10 @@ void main() {
 /// A custom [Agent] that delegates [run] to a callback.
 class _CustomAgent extends Agent {
   _CustomAgent({
-    required String name,
+    required super.name,
     required Future<AgentResult> Function(String, FileContext?) handler,
   }) : _handler = handler,
        super(
-         name: name,
          client: LmStudioClient(AgentsCoreConfig(logger: const SilentLogger())),
          config: AgentsCoreConfig(logger: const SilentLogger()),
        );

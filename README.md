@@ -150,7 +150,8 @@ Future<void> main() async {
 
 ### Multi-agent pipeline (Orchestrator)
 
-Chain agents together in a sequential pipeline:
+Chain agents together in a sequential pipeline. Steps can be single-agent
+(`AgentStep`) or produce-review loops (`AgentLoopStep`):
 
 ```dart
 import 'package:agents_core/agents_core.dart';
@@ -168,18 +169,40 @@ Future<void> main() async {
     name: 'writer', client: client, config: config,
     systemPrompt: 'Write a polished summary.',
   );
+  final reviewer = SimpleAgent(
+    name: 'reviewer', client: client, config: config,
+    systemPrompt: 'Review the summary. Reply with APPROVED if acceptable.',
+  );
 
   final orchestrator = Orchestrator(
     context: ctx,
     steps: [
+      // Single-agent step
       AgentStep(agent: researcher, taskPrompt: 'Research quantum computing'),
-      AgentStep(agent: writer, taskPrompt: 'Summarise the research'),
+      // Produce-review loop step
+      AgentLoopStep(
+        producer: writer,
+        reviewer: reviewer,
+        isAccepted: (result, _) => result.output.contains('APPROVED'),
+        taskPrompt: 'Write and refine a summary of the research',
+        maxIterations: 3,
+      ),
     ],
     onError: OrchestratorErrorPolicy.continueOnError,
   );
 
   final result = await orchestrator.run();
-  print('Steps completed: ${result.stepResults.length}');
+
+  for (final stepResult in result.stepResults) {
+    print('Output: ${stepResult.output}');
+    print('Tokens: ${stepResult.tokensUsed}');
+
+    if (stepResult is AgentLoopStepResult) {
+      print('Loop accepted: ${stepResult.accepted}');
+      print('Iterations: ${stepResult.iterationCount}');
+    }
+  }
+
   print('Duration: ${result.duration}');
   client.dispose();
 }
@@ -308,7 +331,7 @@ final loop = AgentLoop(
 | **Models** | `ChatMessage`, `ChatCompletionRequest`, `ChatCompletionResponse`, `ChatCompletionChunk`, `ToolDefinition`, `ToolCall`, `LmModel` | Request/response data structures |
 | **Config** | `AgentsCoreConfig`, `Logger`, `StderrLogger`, `SilentLogger` | Configuration and logging |
 | **File Context** | `FileContext`, `readFileTool`, `writeFileTool`, `listFilesTool`, `createHandlers` | Sandboxed file operations with tool definitions |
-| **Orchestrator** | `Orchestrator`, `AgentStep`, `OrchestratorResult`, `OrchestratorErrorPolicy` | Sequential multi-agent pipelines |
+| **Orchestrator** | `Orchestrator`, `OrchestratorStep`, `AgentStep`, `AgentLoopStep`, `OrchestratorResult`, `StepResult`, `AgentStepResult`, `AgentLoopStepResult`, `OrchestratorErrorPolicy` | Sequential multi-agent pipelines with mixed step types |
 | **AgentLoop** | `AgentLoop`, `AgentLoopIteration`, `AgentLoopResult` | Iterative produce-review refinement loop |
 | **Docker** | `DockerClient`, `DockerRunResult` | Container management for sandboxed execution |
 | **Python** | `PythonToolAgent`, `PythonExecutionTool` | Python code execution in Docker |
@@ -325,6 +348,8 @@ See the [`example/`](example/) directory for runnable examples:
 - [`python_agent.dart`](example/python_agent.dart) — PythonToolAgent with Docker execution
 - [`multi_agent.dart`](example/multi_agent.dart) — Multi-agent orchestration pipeline
 - [`agent_loop.dart`](example/agent_loop.dart) — Produce-review loop with AgentLoop
+- [`orchestrator_with_agent_loop.dart`](example/orchestrator_with_agent_loop.dart) — Orchestrator pipeline mixing AgentStep with AgentLoopStep
+- [`feature_development_pipeline.dart`](example/feature_development_pipeline.dart) — Realistic 5-stage software development pipeline
 - [`api_key_config.dart`](example/api_key_config.dart) — API key configuration (explicit, env var, copyWith)
 
 ## Configuration

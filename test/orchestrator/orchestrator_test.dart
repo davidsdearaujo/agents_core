@@ -550,7 +550,7 @@ void main() {
 
     tearDown(() => tempDir.deleteSync(recursive: true));
 
-    test('stepResults contains AgentResult from each executed step', () async {
+    test('stepResults contains one entry per executed step', () async {
       final r1 = const AgentResult(output: 'out1', tokensUsed: 10);
       final r2 = const AgentResult(output: 'out2', tokensUsed: 20);
 
@@ -563,6 +563,7 @@ void main() {
       );
       final result = await orch.run();
       expect(result.stepResults, hasLength(2));
+      // Access via the common StepResult accessor — works for any StepResult subtype.
       expect(result.stepResults[0].output, 'out1');
       expect(result.stepResults[0].tokensUsed, 10);
       expect(result.stepResults[1].output, 'out2');

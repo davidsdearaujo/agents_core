@@ -1,5 +1,84 @@
 # Changelog
 
+## 0.3.0 — 2026-03-26
+
+Previously, orchestrator pipelines only supported single-agent steps, forcing
+produce-review loops to be managed outside the pipeline. This release introduces
+a step hierarchy that lets you mix single-agent tasks and iterative review cycles
+in the same orchestrator, enabling end-to-end workflows like "research → develop
+→ review" without glue code. Existing `AgentStep` usage is fully backward-compatible.
+
+### Migration Notes
+
+#### `OrchestratorResult.stepResults` type change
+
+`stepResults` changed from `List<AgentResult>` to `List<StepResult>`. Code
+that accessed `AgentResult` properties directly needs to use the common
+`StepResult` accessors or unwrap via pattern matching:
+
+```dart
+// Before (0.2.x)
+for (final agentResult in result.stepResults) {
+  print(agentResult.output);
+  print(agentResult.stoppedReason);
+}
+
+// After (0.3.0) — common accessors work on all subtypes
+for (final stepResult in result.stepResults) {
+  print(stepResult.output);     // available on all StepResult subtypes
+  print(stepResult.tokensUsed); // available on all StepResult subtypes
+
+  // Type-specific access via pattern matching
+  if (stepResult is AgentStepResult) {
+    print(stepResult.agentResult.stoppedReason);
+  } else if (stepResult is AgentLoopStepResult) {
+    print(stepResult.accepted);
+    print(stepResult.iterationCount);
+  }
+}
+```
+
+#### `Orchestrator.steps` type widened
+
+`steps` changed from `List<AgentStep>` to `List<OrchestratorStep>`. Existing
+code that passes a `List<AgentStep>` continues to work without changes since
+`AgentStep` now extends `OrchestratorStep`.
+
+### Features
+
+#### Orchestrator Step Hierarchy
+- `OrchestratorStep` — abstract base class for all pipeline steps with
+  `taskPrompt` and optional `condition` guard. Enables polymorphic step
+  pipelines.
+- `AgentLoopStep` — new step type that embeds a produce-review loop directly
+  inside an `Orchestrator` pipeline. Supports static and dynamic
+  (`AgentLoopStep.dynamic`) task prompts, custom prompt builders, and
+  configurable `maxIterations`.
+- `StepResult` — abstract base for step results with uniform `output` and
+  `tokensUsed` accessors.
+- `AgentStepResult` — wraps `AgentResult` from a single-agent step.
+- `AgentLoopStepResult` — wraps `AgentLoopResult` from a produce-review loop
+  step, with `accepted` and `iterationCount` convenience accessors.
+
+#### Orchestrator Refactoring
+- `Orchestrator.steps` now accepts `List<OrchestratorStep>` (was
+  `List<AgentStep>`), enabling mixed pipelines of `AgentStep` and
+  `AgentLoopStep`.
+- `OrchestratorResult.stepResults` changed from `List<AgentResult>` to
+  `List<StepResult>` — use `is AgentStepResult` or `is AgentLoopStepResult`
+  for type-specific access.
+- `AgentStep` now extends `OrchestratorStep` (backward-compatible — existing
+  `AgentStep` usage continues to work unchanged).
+
+### Examples
+- New `orchestrator_with_agent_loop.dart` — 3-step pipeline mixing
+  `AgentStep` with `AgentLoopStep`.
+- New `feature_development_pipeline.dart` — realistic 5-stage software
+  development pipeline with `PersistingAgent` decorator, dynamic prompts,
+  conditional steps, and `AgentLoopStep` with custom prompt builders.
+
+
+
 ## 0.2.1 — 2026-03-26
 - Expand `README.md` with detailed `AgentLoop` usage and examples
 

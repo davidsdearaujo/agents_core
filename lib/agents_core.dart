@@ -35,6 +35,8 @@ export 'src/models/tool_call.dart';
 export 'src/models/tool_definition.dart';
 export 'src/orchestrator/agent_loop.dart';
 export 'src/orchestrator/orchestrator.dart';
+export 'src/orchestrator/orchestrator_step.dart';
+export 'src/orchestrator/step_result.dart';
 export 'src/python/file_context_tools.dart';
 export 'src/python/python_execution_tool.dart';
 export 'src/python/python_tool_agent.dart';
