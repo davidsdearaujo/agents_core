@@ -322,6 +322,64 @@ final loop = AgentLoop(
 | `AgentLoopIteration` | One iteration record with `index`, `producerResult`, and `reviewerResult` |
 | `AgentLoopResult` | Overall result — `accepted`, `iterationCount`, `totalTokensUsed`, `duration`, `reachedMaxIterations` |
 
+### Loop detection
+
+Agents and loops can detect when the LLM is stuck repeating itself. Enable it
+by passing a `LoopDetectionConfig`:
+
+```dart
+import 'package:agents_core/agents_core.dart';
+
+Future<void> main() async {
+  final config = AgentsCoreConfig();
+  final client = LmStudioClient(config);
+
+  final agent = ReActAgent(
+    name: 'researcher',
+    client: client,
+    config: config,
+    model: 'llama-3-8b',
+    systemPrompt: 'You are a research assistant.',
+    tools: [readFileTool, writeFileTool],
+    toolHandlers: createHandlers(
+      FileContext(workspacePath: '/tmp/workspace'),
+    ),
+    maxIterations: 15,
+    // Stop if the LLM makes the same tool calls 3 times in a row,
+    // or produces near-identical outputs 3 times in a row.
+    loopDetectionConfig: const LoopDetectionConfig(
+      maxConsecutiveIdenticalToolCalls: 3,
+      maxConsecutiveIdenticalOutputs: 3,
+      similarityThreshold: 0.85, // bigram Sørensen–Dice
+    ),
+  );
+
+  final result = await agent.run('Summarise the workspace files.');
+  print(result.output);
+  print(result.stoppedReason); // "completed", "loop_detected", etc.
+
+  client.dispose();
+}
+```
+
+`AgentLoop` supports the same parameter — the detector tracks producer outputs
+and stops early when repetition is found:
+
+```dart
+final loop = AgentLoop(
+  context: ctx,
+  producer: writer,
+  reviewer: reviewer,
+  isAccepted: (result, _) => result.output.contains('APPROVED'),
+  maxIterations: 5,
+  loopDetectionConfig: const LoopDetectionConfig(),
+);
+
+final result = await loop.run('Write a summary');
+print(result.stoppedReason); // "accepted", "max_iterations", or "loop_detected"
+print(result.loopDetected);  // true if stopped due to loop
+```
+
 ## Module Overview
 
 | Module | Key Classes | Description |
@@ -333,6 +391,7 @@ final loop = AgentLoop(
 | **File Context** | `FileContext`, `readFileTool`, `writeFileTool`, `listFilesTool`, `createHandlers` | Sandboxed file operations with tool definitions |
 | **Orchestrator** | `Orchestrator`, `OrchestratorStep`, `AgentStep`, `AgentLoopStep`, `OrchestratorResult`, `StepResult`, `AgentStepResult`, `AgentLoopStepResult`, `OrchestratorErrorPolicy` | Sequential multi-agent pipelines with mixed step types |
 | **AgentLoop** | `AgentLoop`, `AgentLoopIteration`, `AgentLoopResult` | Iterative produce-review refinement loop |
+| **Loop Detection** | `LoopDetectionConfig`, `LoopDetector`, `LoopCheckResult` | Detect and break repetitive LLM loops via tool-call fingerprinting and bigram similarity |
 | **Docker** | `DockerClient`, `DockerRunResult` | Container management for sandboxed execution |
 | **Python** | `PythonToolAgent`, `PythonExecutionTool` | Python code execution in Docker |
 | **Quick** | `ask`, `askStream`, `Conversation` | Convenience functions for common patterns |

@@ -1686,6 +1686,127 @@ void main() {
       expect(executionLog, ['p0', 'r0', 'p1', 'r1', 'p2', 'r2']);
     });
   });
+
+  // ── AgentLoop.run() — loop detection ─────────────────────────────────
+
+  group('AgentLoop.run() — loop detection', () {
+    late Directory tempDir;
+    late FileContext ctx;
+
+    setUp(() {
+      final result = _tempContext();
+      tempDir = result.dir;
+      ctx = result.ctx;
+    });
+
+    tearDown(() => tempDir.deleteSync(recursive: true));
+
+    test(
+      'producer returns same output repeatedly → '
+      'stoppedReason="loop_detected" and accepted=false',
+      () async {
+        // Producer always returns the same output; with default threshold
+        // of 3, the loop should stop after 3 identical producer outputs.
+        final producer = _FakeAgent.single(
+          name: 'producer',
+          result: const AgentResult(output: 'same output every time'),
+        );
+        final reviewer = _FakeAgent.single(
+          name: 'reviewer',
+          result: const AgentResult(output: 'needs work'),
+        );
+
+        final loop = AgentLoop(
+          context: ctx,
+          producer: producer,
+          reviewer: reviewer,
+          isAccepted: (result, iteration) => false, // never accept
+          maxIterations: 10,
+          loopDetectionConfig: const LoopDetectionConfig(
+            maxConsecutiveIdenticalOutputs: 3,
+          ),
+        );
+
+        final result = await loop.run('task');
+
+        expect(result.stoppedReason, equals('loop_detected'));
+        expect(result.accepted, isFalse);
+        expect(result.loopDetected, isTrue);
+        expect(result.iterationCount, 3);
+        expect(producer.callCount, 3);
+        expect(reviewer.callCount, 3);
+      },
+    );
+
+    test('different outputs → normal completion (accepted)', () async {
+      // Outputs must differ significantly (bigram similarity < 0.85) to
+      // avoid triggering the near-identical output detector.
+      final producer = _FakeAgent(
+        name: 'producer',
+        results: [
+          const AgentResult(output: 'Implementing the database schema now'),
+          const AgentResult(output: 'Refactoring the HTTP handler layer'),
+          const AgentResult(output: 'All unit tests pass and coverage is green'),
+        ],
+      );
+      final reviewer = _FakeAgent(
+        name: 'reviewer',
+        results: [
+          const AgentResult(output: 'needs work'),
+          const AgentResult(output: 'needs work'),
+          const AgentResult(output: 'APPROVED'),
+        ],
+      );
+
+      final loop = AgentLoop(
+        context: ctx,
+        producer: producer,
+        reviewer: reviewer,
+        isAccepted: (result, iteration) => result.output.contains('APPROVED'),
+        maxIterations: 10,
+        loopDetectionConfig: const LoopDetectionConfig(
+          maxConsecutiveIdenticalOutputs: 3,
+        ),
+      );
+
+      final result = await loop.run('task');
+
+      expect(result.stoppedReason, equals('accepted'));
+      expect(result.accepted, isTrue);
+      expect(result.loopDetected, isFalse);
+    });
+
+    test('no config → runs to maxIterations despite identical outputs',
+        () async {
+      // Same output from producer every time, but no loop detection
+      // configured — should exhaust maxIterations.
+      final producer = _FakeAgent.single(
+        name: 'producer',
+        result: const AgentResult(output: 'same output'),
+      );
+      final reviewer = _FakeAgent.single(
+        name: 'reviewer',
+        result: const AgentResult(output: 'rejected'),
+      );
+
+      final loop = AgentLoop(
+        context: ctx,
+        producer: producer,
+        reviewer: reviewer,
+        isAccepted: (result, iteration) => false,
+        maxIterations: 3,
+        loopDetectionConfig: null,
+      );
+
+      final result = await loop.run('task');
+
+      expect(result.stoppedReason, equals('max_iterations'));
+      expect(result.accepted, isFalse);
+      expect(result.iterationCount, 3);
+      expect(result.loopDetected, isFalse);
+      expect(result.reachedMaxIterations, isTrue);
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------

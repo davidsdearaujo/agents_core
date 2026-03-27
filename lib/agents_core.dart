@@ -24,6 +24,8 @@ export 'src/exceptions/docker_exceptions.dart';
 export 'src/exceptions/file_context_exceptions.dart';
 export 'src/exceptions/lm_studio_exceptions.dart';
 export 'src/exceptions/sse_exceptions.dart';
+export 'src/loop_detection/loop_detection_config.dart';
+export 'src/loop_detection/loop_detector.dart';
 export 'src/models/chat_completion_chunk.dart';
 export 'src/models/chat_completion_request.dart';
 export 'src/models/chat_completion_response.dart';

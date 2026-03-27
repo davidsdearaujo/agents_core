@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.3.3 — 2026-03-27
+
+### Features
+
+#### Smart Loop Detection
+- New `LoopDetectionConfig` — immutable configuration class controlling loop
+  detection thresholds: `maxConsecutiveIdenticalToolCalls` (default 3),
+  `maxConsecutiveIdenticalOutputs` (default 3), and `similarityThreshold`
+  (default 0.85). Supports `const` construction, value equality, and
+  `toString()`.
+- New `LoopDetector` — stateful detector that tracks consecutive identical
+  tool-call sequences (via sorted fingerprints) and near-identical text outputs
+  (via bigram Sørensen–Dice similarity). Call `recordToolCalls()` /
+  `recordOutput()` per iteration, then `check()` to get a `LoopCheckResult`.
+  Includes `reset()` for reuse across tasks.
+- New `LoopCheckResult` — result type with `isLooping` flag and human-readable
+  `reason`. Provides a static `LoopCheckResult.ok` constant for the non-looping
+  case.
+- `LoopDetector.bigramSimilarity()` — static utility that computes the
+  Sørensen–Dice coefficient over character bigrams for fuzzy string comparison.
+
+#### ReActAgent Integration
+- `ReActAgent` now accepts an optional `loopDetectionConfig` parameter. When
+  provided, a `LoopDetector` is created per `run()` invocation and checks for
+  repetitive tool-call sequences or near-identical outputs after each iteration.
+  Detected loops stop the agent with `stoppedReason: "loop_detected"`.
+
+#### AgentLoop Integration
+- `AgentLoop` now accepts an optional `loopDetectionConfig` parameter. When
+  provided, producer outputs are tracked each iteration and the loop stops early
+  with `stoppedReason: "loop_detected"` if repetitive patterns are found.
+- `AgentLoopResult` gains a `stoppedReason` field (`"accepted"`,
+  `"max_iterations"`, or `"loop_detected"`) and two new convenience getters:
+  `loopDetected` and an updated `reachedMaxIterations` that excludes
+  loop-detection stops.
+
 ## 0.3.2 — 2026-03-27
 
 ### Examples

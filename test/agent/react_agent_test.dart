@@ -898,5 +898,239 @@ void main() {
         expect(receivedArgs, equals(<String, dynamic>{}));
       });
     });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Loop detection
+    // ─────────────────────────────────────────────────────────────────────────
+    group('loop detection', () {
+      test(
+        '3 identical tool-call signatures → stoppedReason="loop_detected" '
+        'with exactly 3 requests',
+        () async {
+          final client = _FakeClient([
+            _toolCallResponse(
+              toolCalls: [
+                _toolCall(name: 'search', arguments: '{"q":"dart"}'),
+              ],
+            ),
+            _toolCallResponse(
+              toolCalls: [
+                _toolCall(name: 'search', arguments: '{"q":"dart"}'),
+              ],
+            ),
+            _toolCallResponse(
+              toolCalls: [
+                _toolCall(name: 'search', arguments: '{"q":"dart"}'),
+              ],
+            ),
+          ]);
+          final agent = ReActAgent(
+            name: 'react',
+            client: client,
+            config: _silentConfig(),
+            toolHandlers: {
+              'search': (args) async => 'no results',
+            },
+            maxIterations: 10,
+            loopDetectionConfig: const LoopDetectionConfig(
+              maxConsecutiveIdenticalToolCalls: 3,
+            ),
+          );
+          final result = await agent.run('Find info');
+          expect(result.stoppedReason, equals('loop_detected'));
+          expect(client.capturedRequests, hasLength(3));
+        },
+      );
+
+      test('3 different tool calls → normal completion', () async {
+        final client = _FakeClient([
+          _toolCallResponse(
+            toolCalls: [
+              _toolCall(name: 'search', arguments: '{"q":"a"}', id: 'c1'),
+            ],
+          ),
+          _toolCallResponse(
+            toolCalls: [
+              _toolCall(name: 'fetch', arguments: '{"url":"b"}', id: 'c2'),
+            ],
+          ),
+          _toolCallResponse(
+            toolCalls: [
+              _toolCall(name: 'parse', arguments: '{"data":"c"}', id: 'c3'),
+            ],
+          ),
+          _textResponse(content: 'Done'),
+        ]);
+        final agent = ReActAgent(
+          name: 'react',
+          client: client,
+          config: _silentConfig(),
+          toolHandlers: {
+            'search': (args) async => 'result a',
+            'fetch': (args) async => 'result b',
+            'parse': (args) async => 'result c',
+          },
+          maxIterations: 10,
+          loopDetectionConfig: const LoopDetectionConfig(
+            maxConsecutiveIdenticalToolCalls: 3,
+          ),
+        );
+        final result = await agent.run('Task');
+        expect(result.stoppedReason, equals('completed'));
+      });
+
+      test('3 identical output texts → stoppedReason="loop_detected"',
+          () async {
+        // Tool calls are different each iteration, but the assistant content
+        // text is identical — the output-repetition detector should trigger.
+        final client = _FakeClient([
+          _toolCallResponse(
+            toolCalls: [_toolCall(name: 'tool_a', id: 'c1')],
+            content: 'I will try again',
+          ),
+          _toolCallResponse(
+            toolCalls: [_toolCall(name: 'tool_b', id: 'c2')],
+            content: 'I will try again',
+          ),
+          _toolCallResponse(
+            toolCalls: [_toolCall(name: 'tool_c', id: 'c3')],
+            content: 'I will try again',
+          ),
+        ]);
+        final agent = ReActAgent(
+          name: 'react',
+          client: client,
+          config: _silentConfig(),
+          toolHandlers: {
+            'tool_a': (args) async => 'result a',
+            'tool_b': (args) async => 'result b',
+            'tool_c': (args) async => 'result c',
+          },
+          maxIterations: 10,
+          loopDetectionConfig: const LoopDetectionConfig(
+            maxConsecutiveIdenticalOutputs: 3,
+          ),
+        );
+        final result = await agent.run('Task');
+        expect(result.stoppedReason, equals('loop_detected'));
+      });
+
+      test('null loopDetectionConfig → falls through to max_iterations',
+          () async {
+        // Same tool calls repeated, but no loop detection configured.
+        final client = _FakeClient([
+          _toolCallResponse(
+            toolCalls: [
+              _toolCall(name: 'search', arguments: '{"q":"dart"}'),
+            ],
+          ),
+          _toolCallResponse(
+            toolCalls: [
+              _toolCall(name: 'search', arguments: '{"q":"dart"}'),
+            ],
+          ),
+          _toolCallResponse(
+            toolCalls: [
+              _toolCall(name: 'search', arguments: '{"q":"dart"}'),
+            ],
+          ),
+        ]);
+        final agent = ReActAgent(
+          name: 'react',
+          client: client,
+          config: _silentConfig(),
+          toolHandlers: {
+            'search': (args) async => 'no results',
+          },
+          maxIterations: 3,
+          loopDetectionConfig: null,
+        );
+        final result = await agent.run('Find info');
+        expect(result.stoppedReason, equals('max_iterations'));
+        expect(client.capturedRequests, hasLength(3));
+      });
+
+      test(
+        'threshold 0 → detection disabled '
+        '(falls through to max_iterations)',
+        () async {
+          // With both consecutive-identical thresholds set to 0, loop
+          // detection is effectively disabled — identical patterns should
+          // not trigger early termination.
+          final client = _FakeClient([
+            _toolCallResponse(
+              toolCalls: [
+                _toolCall(name: 'search', arguments: '{"q":"dart"}'),
+              ],
+            ),
+            _toolCallResponse(
+              toolCalls: [
+                _toolCall(name: 'search', arguments: '{"q":"dart"}'),
+              ],
+            ),
+            _toolCallResponse(
+              toolCalls: [
+                _toolCall(name: 'search', arguments: '{"q":"dart"}'),
+              ],
+            ),
+          ]);
+          final agent = ReActAgent(
+            name: 'react',
+            client: client,
+            config: _silentConfig(),
+            toolHandlers: {
+              'search': (args) async => 'no results',
+            },
+            maxIterations: 3,
+            loopDetectionConfig: const LoopDetectionConfig(
+              maxConsecutiveIdenticalToolCalls: 0,
+              maxConsecutiveIdenticalOutputs: 0,
+            ),
+          );
+          final result = await agent.run('Find info');
+          expect(result.stoppedReason, equals('max_iterations'));
+          expect(client.capturedRequests, hasLength(3));
+        },
+      );
+
+      test(
+        'default LoopDetectionConfig() with identical tool calls → '
+        'stoppedReason="loop_detected" after 3 iterations',
+        () async {
+          // Manual verification: construct a ReActAgent with the default
+          // LoopDetectionConfig() (no arguments) and a mock client that
+          // returns the same tool call every iteration. The agent must stop
+          // with stoppedReason="loop_detected" after exactly 3 requests —
+          // matching the default maxConsecutiveIdenticalToolCalls of 3.
+          final identicalToolCall =
+              _toolCall(name: 'lookup', arguments: '{"key":"value"}');
+
+          final client = _FakeClient([
+            _toolCallResponse(toolCalls: [identicalToolCall]),
+            _toolCallResponse(toolCalls: [identicalToolCall]),
+            _toolCallResponse(toolCalls: [identicalToolCall]),
+          ]);
+
+          final agent = ReActAgent(
+            name: 'verifier',
+            client: client,
+            config: _silentConfig(),
+            toolHandlers: {
+              'lookup': (args) async => 'result',
+            },
+            maxIterations: 10,
+            loopDetectionConfig:
+                const LoopDetectionConfig(), // all defaults (threshold = 3)
+          );
+
+          final result = await agent.run('Do the task');
+
+          expect(result.stoppedReason, equals('loop_detected'),
+              reason: 'Should stop due to loop, not max_iterations');
+          expect(client.capturedRequests, hasLength(3),
+              reason: 'Loop detected after exactly 3 identical tool calls');
+        },
+      );
+    });
   });
 }
