@@ -350,6 +350,7 @@ See the [`example/`](example/) directory for runnable examples:
 - [`agent_loop.dart`](example/agent_loop.dart) — Produce-review loop with AgentLoop
 - [`orchestrator_with_agent_loop.dart`](example/orchestrator_with_agent_loop.dart) — Orchestrator pipeline mixing AgentStep with AgentLoopStep
 - [`feature_development_pipeline.dart`](example/feature_development_pipeline.dart) — Realistic 5-stage software development pipeline
+- [`bugfix_pipeline.dart`](example/bugfix_pipeline.dart) — End-to-end bugfix workflow with 7 agents across 5 pipeline steps
 - [`api_key_config.dart`](example/api_key_config.dart) — API key configuration (explicit, env var, copyWith)
 
 ## Configuration

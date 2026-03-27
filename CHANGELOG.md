@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.2 — 2026-03-27
+
+### Examples
+
+- New `bugfix_pipeline.dart` — realistic 5-step end-to-end bugfix workflow
+  demonstrating `ReActAgent` with file-context tools, `AgentLoopStep.dynamic`
+  produce-review loops, `AgentStep.dynamic` with conditional execution,
+  custom `buildProducerPrompt` for reviewer-feedback injection, and
+  `StepResult` pattern matching for post-run inspection. Seven specialised
+  agents collaborate across triage → root-cause analysis → fix → regression
+  tests → PR summary, all orchestrated by a single `Orchestrator.run()` call.
+
 ## 0.3.1 — 2026-03-26
 
 ### Bug Fixes
