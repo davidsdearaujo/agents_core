@@ -18,6 +18,16 @@ import 'logger.dart';
 ///   logger: StderrLogger(level: LogLevel.debug),
 /// );
 /// ```
+///
+/// To globally disable all logging:
+///
+/// ```dart
+/// final config = AgentsCoreConfig(loggingEnabled: false);
+/// ```
+///
+/// Logging can also be disabled via the `AGENTS_LOGGING_ENABLED`
+/// environment variable (set to `"false"` or `"0"`) when using
+/// [AgentsCoreConfig.fromEnvironment].
 class AgentsCoreConfig {
   /// Creates an [AgentsCoreConfig].
   ///
@@ -39,6 +49,10 @@ class AgentsCoreConfig {
   /// (no authentication). Can also be set via the `AGENTS_API_KEY`
   /// environment variable when using [AgentsCoreConfig.fromEnvironment].
   ///
+  /// [loggingEnabled] controls whether logging is globally active. When
+  /// `false`, the [logger] getter returns a [SilentLogger] regardless of
+  /// the configured logger instance. Defaults to `true` (logging active).
+  ///
   /// [logger] defaults to a [StderrLogger] at [LogLevel.info], which writes
   /// timestamped messages to stderr. Pass a [SilentLogger] to suppress output.
   AgentsCoreConfig({
@@ -48,10 +62,11 @@ class AgentsCoreConfig {
     this.dockerImage = 'python:3.12-slim',
     this.workspacePath = '/tmp/agents_workspace',
     this.apiKey,
+    this.loggingEnabled = true,
     Logger? logger,
   })  : lmStudioBaseUrl =
             lmStudioBaseUrl ?? Uri.parse('http://localhost:1234'),
-        logger = logger ?? const StderrLogger();
+        _logger = logger ?? const StderrLogger();
 
   /// Creates an [AgentsCoreConfig] from environment variables.
   ///
@@ -65,10 +80,13 @@ class AgentsCoreConfig {
   /// - `AGENTS_WORKSPACE_PATH` → [workspacePath]
   /// - `AGENTS_REQUEST_TIMEOUT_SECONDS` → [requestTimeout] (parsed as int)
   /// - `AGENTS_API_KEY` → [apiKey]
+  /// - `AGENTS_LOGGING_ENABLED` → [loggingEnabled] (`"false"` or `"0"` to
+  ///   disable; any other value or absent → enabled)
   ///
   /// Invalid or missing values fall back to constructor defaults.
   factory AgentsCoreConfig.fromEnvironment({
     Map<String, String>? environment,
+    bool? loggingEnabled,
     Logger? logger,
   }) {
     final env = environment ?? Platform.environment;
@@ -94,6 +112,9 @@ class AgentsCoreConfig {
       }
     }
 
+    // Parse AGENTS_LOGGING_ENABLED — explicit parameter wins over env var.
+    final resolvedLoggingEnabled = loggingEnabled ?? _parseLoggingEnabled(env);
+
     return AgentsCoreConfig(
       lmStudioBaseUrl: lmStudioBaseUrl,
       defaultModel:
@@ -102,8 +123,20 @@ class AgentsCoreConfig {
       dockerImage: env['AGENTS_DOCKER_IMAGE'] ?? 'python:3.12-slim',
       workspacePath: env['AGENTS_WORKSPACE_PATH'] ?? '/tmp/agents_workspace',
       apiKey: env['AGENTS_API_KEY'],
+      loggingEnabled: resolvedLoggingEnabled,
       logger: logger,
     );
+  }
+
+  /// Parses `AGENTS_LOGGING_ENABLED` from [env].
+  ///
+  /// Returns `false` when the value is `"false"` or `"0"` (case-insensitive).
+  /// Returns `true` for any other value or when the key is absent.
+  static bool _parseLoggingEnabled(Map<String, String> env) {
+    final value = env['AGENTS_LOGGING_ENABLED'];
+    if (value == null) return true;
+    final lower = value.trim().toLowerCase();
+    return lower != 'false' && lower != '0';
   }
 
   /// The base URL of the LM Studio server.
@@ -144,8 +177,28 @@ class AgentsCoreConfig {
   /// using [AgentsCoreConfig.fromEnvironment].
   final String? apiKey;
 
+  /// Whether logging is globally enabled.
+  ///
+  /// When `false`, the [logger] getter returns a [SilentLogger] regardless
+  /// of the configured logger instance. This provides a single switch to
+  /// suppress all library-wide diagnostic output without replacing the
+  /// logger itself.
+  ///
+  /// Defaults to `true` (logging active). Can also be controlled via the
+  /// `AGENTS_LOGGING_ENABLED` environment variable (set to `"false"` or
+  /// `"0"` to disable) when using [AgentsCoreConfig.fromEnvironment].
+  final bool loggingEnabled;
+
+  /// The configured logger instance (before the [loggingEnabled] gate).
+  final Logger _logger;
+
   /// The logger used across the library for diagnostic output.
-  final Logger logger;
+  ///
+  /// When [loggingEnabled] is `false`, a [SilentLogger] is returned
+  /// regardless of the configured logger instance. This allows callers
+  /// to use `config.logger` unconditionally — the global toggle is
+  /// applied transparently.
+  Logger get logger => loggingEnabled ? _logger : const SilentLogger();
 
   /// Returns a new [AgentsCoreConfig] with the specified fields replaced.
   ///
@@ -158,6 +211,7 @@ class AgentsCoreConfig {
     String? workspacePath,
     String? apiKey,
     bool clearApiKey = false,
+    bool? loggingEnabled,
     Logger? logger,
   }) {
     return AgentsCoreConfig(
@@ -167,11 +221,12 @@ class AgentsCoreConfig {
       dockerImage: dockerImage ?? this.dockerImage,
       workspacePath: workspacePath ?? this.workspacePath,
       apiKey: clearApiKey ? null : (apiKey ?? this.apiKey),
-      logger: logger ?? this.logger,
+      loggingEnabled: loggingEnabled ?? this.loggingEnabled,
+      logger: logger ?? _logger,
     );
   }
 
-  /// Two [AgentsCoreConfig] instances are equal when all six value fields
+  /// Two [AgentsCoreConfig] instances are equal when all seven value fields
   /// match. The [logger] is excluded from equality comparisons because
   /// loggers are stateful singletons, not value objects.
   @override
@@ -183,7 +238,8 @@ class AgentsCoreConfig {
         other.requestTimeout == requestTimeout &&
         other.dockerImage == dockerImage &&
         other.workspacePath == workspacePath &&
-        other.apiKey == apiKey;
+        other.apiKey == apiKey &&
+        other.loggingEnabled == loggingEnabled;
   }
 
   @override
@@ -194,6 +250,7 @@ class AgentsCoreConfig {
         dockerImage,
         workspacePath,
         apiKey,
+        loggingEnabled,
       );
 
   @override
@@ -204,6 +261,7 @@ class AgentsCoreConfig {
       'requestTimeout: $requestTimeout, '
       'dockerImage: $dockerImage, '
       'workspacePath: $workspacePath, '
-      'apiKey: ${apiKey != null ? '***' : 'null'}'
+      'apiKey: ${apiKey != null ? '***' : 'null'}, '
+      'loggingEnabled: $loggingEnabled'
       ')';
 }

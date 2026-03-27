@@ -424,6 +424,7 @@ See the [`example/`](example/) directory for runnable examples:
 | `dockerImage` | `python:3.12-slim` | Docker image for Python execution |
 | `workspacePath` | `/tmp/agents_workspace` | Default workspace path |
 | `apiKey` | `null` | Optional Bearer token for authenticated LM Studio requests |
+| `loggingEnabled` | `true` | Global toggle to enable/disable all logging |
 | `logger` | `StderrLogger(level: LogLevel.info)` | Logger instance |
 
 You can also create configuration from environment variables:
@@ -434,7 +435,79 @@ final config = AgentsCoreConfig.fromEnvironment();
 
 Supported environment variables: `LM_STUDIO_BASE_URL`, `AGENTS_DEFAULT_MODEL`,
 `AGENTS_DOCKER_IMAGE`, `AGENTS_WORKSPACE_PATH`, `AGENTS_REQUEST_TIMEOUT_SECONDS`,
-`AGENTS_API_KEY`.
+`AGENTS_API_KEY`, `AGENTS_LOGGING_ENABLED`.
+
+### Logging
+
+Logging is **enabled by default** — all library components write timestamped
+diagnostic messages to stderr via `StderrLogger`.
+
+#### Disable logging globally
+
+Pass `loggingEnabled: false` to suppress all log output without replacing the
+logger instance:
+
+```dart
+final config = AgentsCoreConfig(loggingEnabled: false);
+```
+
+Or set the `AGENTS_LOGGING_ENABLED` environment variable:
+
+```sh
+export AGENTS_LOGGING_ENABLED=false  # also accepts "0"
+```
+
+Then create the config from the environment:
+
+```dart
+final config = AgentsCoreConfig.fromEnvironment();
+// Logging is now disabled — all logger calls are silently discarded.
+```
+
+#### Re-enable logging on an existing config
+
+Use `copyWith` to toggle logging at any point:
+
+```dart
+final silent = AgentsCoreConfig(loggingEnabled: false);
+final verbose = silent.copyWith(loggingEnabled: true);
+```
+
+#### Custom log level
+
+Control the minimum severity emitted by the default `StderrLogger`:
+
+```dart
+final config = AgentsCoreConfig(
+  logger: StderrLogger(level: LogLevel.debug), // debug, info, warn, error
+);
+```
+
+#### Custom logger
+
+Implement the `Logger` interface to integrate with your own logging framework:
+
+```dart
+class MyLogger extends Logger {
+  @override
+  LogLevel get level => LogLevel.info;
+
+  @override
+  void debug(String message) { /* ... */ }
+  @override
+  void info(String message)  { /* ... */ }
+  @override
+  void warn(String message)  { /* ... */ }
+  @override
+  void error(String message) { /* ... */ }
+}
+
+final config = AgentsCoreConfig(logger: MyLogger());
+```
+
+> **Note:** When `loggingEnabled` is `false`, the `config.logger` getter
+> returns a `SilentLogger` transparently — your custom logger is preserved
+> internally and becomes active again when logging is re-enabled.
 
 ### Authentication
 

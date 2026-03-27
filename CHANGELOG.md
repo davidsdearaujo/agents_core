@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.4 — 2026-03-27
+
+### Features
+
+#### Global Log Control
+- New `loggingEnabled` parameter on `AgentsCoreConfig` — a single boolean switch
+  to globally enable or disable all library-wide diagnostic logging. Defaults to
+  `true` (logging active). When set to `false`, the `logger` getter transparently
+  returns a `SilentLogger` regardless of the configured logger instance, so calling
+  code does not need to check the toggle explicitly.
+- New `AGENTS_LOGGING_ENABLED` environment variable — set to `"false"` or `"0"`
+  (case-insensitive) to disable logging when using `AgentsCoreConfig.fromEnvironment()`.
+  An explicit `loggingEnabled` parameter takes precedence over the environment variable.
+- `copyWith(loggingEnabled: ...)` support for toggling log state on existing configs.
+
 ## 0.3.3 — 2026-03-27
 
 ### Features
