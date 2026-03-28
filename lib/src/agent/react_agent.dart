@@ -38,6 +38,7 @@ typedef ToolHandler = Future<String> Function(Map<String, dynamic> arguments);
 /// - [maxIterations] is reached (`stoppedReason: "max_iterations"`).
 /// - Cumulative token usage exceeds [maxTotalTokens]
 ///   (`stoppedReason: "max_total_tokens"`).
+/// - A terminal tool is called ([terminalTools]) — `stoppedReason: "terminal_tool"`.
 /// - A repetitive loop is detected via [loopDetectionConfig]
 ///   (`stoppedReason: "loop_detected"`).
 ///
@@ -87,6 +88,7 @@ class ReActAgent extends Agent {
     this.maxIterations = 10,
     this.maxTotalTokens,
     this.loopDetectionConfig,
+    this.terminalTools = const {},
   });
 
   /// Maps tool names to their handler functions.
@@ -118,6 +120,16 @@ class ReActAgent extends Agent {
   ///
   /// When `null` (the default), no loop detection is performed.
   final LoopDetectionConfig? loopDetectionConfig;
+
+  /// Tool names that cause the loop to stop immediately after execution.
+  ///
+  /// When the model calls a tool whose name is in this set, the tool is
+  /// executed normally, but the loop breaks right after — no further
+  /// iterations are needed. This is useful for "submit_result" style
+  /// tools where the tool call IS the final answer.
+  ///
+  /// Empty by default (no terminal tools).
+  final Set<String> terminalTools;
 
   /// The default model identifier used when [model] is `null`.
   static const defaultModel = 'lmstudio-community/default';
@@ -215,6 +227,21 @@ class ReActAgent extends Agent {
           content: result,
           toolCallId: toolCallId,
         ));
+      }
+
+      // ── Step 3.1: Check for terminal tool ──────────────────────────
+      if (terminalTools.isNotEmpty) {
+        final calledTerminal = toolCalls.any(
+          (tc) => terminalTools.contains(tc.function?.name),
+        );
+        if (calledTerminal) {
+          stoppedReason = 'terminal_tool';
+          config.logger.info(
+            '[$name] Terminal tool called — stopping after $iterations iteration(s) '
+            '($totalTokens tokens)',
+          );
+          break;
+        }
       }
 
       // ── Step 3.5: Check for repetitive loop ────────────────────────────

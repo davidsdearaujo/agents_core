@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.5 — 2026-03-28
+
+### Features
+
+#### Terminal Tools
+- New `terminalTools` parameter on `ReActAgent` — a `Set<String>` of tool names
+  that cause the ReAct loop to stop immediately after execution with
+  `stoppedReason: "terminal_tool"`. Useful for "submit_result" style tools where
+  the tool call IS the final answer, eliminating unnecessary follow-up iterations.
+
 ## 0.3.4 — 2026-03-27
 
 ### Features

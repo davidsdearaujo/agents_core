@@ -1132,5 +1132,292 @@ void main() {
         },
       );
     });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Terminal tools
+    // ─────────────────────────────────────────────────────────────────────────
+    group('terminal tools', () {
+      test('terminalTools defaults to an empty set', () {
+        final agent = ReActAgent(
+          name: 'a',
+          client: _FakeClient([]),
+          config: _silentConfig(),
+          toolHandlers: {},
+        );
+        expect(agent.terminalTools, isEmpty);
+      });
+
+      test('terminalTools can be set via constructor', () {
+        final agent = ReActAgent(
+          name: 'a',
+          client: _FakeClient([]),
+          config: _silentConfig(),
+          toolHandlers: {},
+          terminalTools: {'submit_result', 'done'},
+        );
+        expect(agent.terminalTools, containsAll(['submit_result', 'done']));
+      });
+
+      test(
+        'stoppedReason is "terminal_tool" when a terminal tool is called',
+        () async {
+          final client = _FakeClient([
+            _toolCallResponse(
+              toolCalls: [_toolCall(name: 'submit_result', id: 'c1')],
+            ),
+          ]);
+          final agent = ReActAgent(
+            name: 'react',
+            client: client,
+            config: _silentConfig(),
+            toolHandlers: {
+              'submit_result': (args) async => 'submitted',
+            },
+            terminalTools: {'submit_result'},
+            maxIterations: 10,
+          );
+          final result = await agent.run('Task');
+          expect(result.stoppedReason, equals('terminal_tool'));
+        },
+      );
+
+      test('terminal tool handler is executed before stopping', () async {
+        var handlerCalled = false;
+        final client = _FakeClient([
+          _toolCallResponse(
+            toolCalls: [_toolCall(name: 'submit', id: 'c1')],
+          ),
+        ]);
+        final agent = ReActAgent(
+          name: 'react',
+          client: client,
+          config: _silentConfig(),
+          toolHandlers: {
+            'submit': (args) async {
+              handlerCalled = true;
+              return 'done';
+            },
+          },
+          terminalTools: {'submit'},
+          maxIterations: 10,
+        );
+        await agent.run('Task');
+        expect(handlerCalled, isTrue);
+      });
+
+      test('loop stops after 1 iteration when terminal tool is called',
+          () async {
+        final client = _FakeClient([
+          _toolCallResponse(
+            toolCalls: [_toolCall(name: 'finish', id: 'c1')],
+          ),
+          // This response should never be reached.
+          _textResponse(content: 'Should not see this'),
+        ]);
+        final agent = ReActAgent(
+          name: 'react',
+          client: client,
+          config: _silentConfig(),
+          toolHandlers: {
+            'finish': (args) async => 'finished',
+          },
+          terminalTools: {'finish'},
+          maxIterations: 10,
+        );
+        await agent.run('Task');
+        expect(client.capturedRequests, hasLength(1));
+      });
+
+      test('terminal tool call is recorded in toolCallsMade', () async {
+        final client = _FakeClient([
+          _toolCallResponse(
+            toolCalls: [_toolCall(name: 'submit', id: 'submit_1')],
+          ),
+        ]);
+        final agent = ReActAgent(
+          name: 'react',
+          client: client,
+          config: _silentConfig(),
+          toolHandlers: {
+            'submit': (args) async => 'ok',
+          },
+          terminalTools: {'submit'},
+          maxIterations: 10,
+        );
+        final result = await agent.run('Task');
+        expect(result.toolCallsMade, hasLength(1));
+        expect(result.toolCallsMade.first.id, equals('submit_1'));
+      });
+
+      test('non-terminal tool calls proceed normally', () async {
+        final client = _FakeClient([
+          _toolCallResponse(
+            toolCalls: [_toolCall(name: 'search', id: 'c1')],
+          ),
+          _textResponse(content: 'Done searching'),
+        ]);
+        final agent = ReActAgent(
+          name: 'react',
+          client: client,
+          config: _silentConfig(),
+          toolHandlers: {
+            'search': (args) async => 'results',
+          },
+          terminalTools: {'submit'}, // 'search' is NOT terminal
+          maxIterations: 10,
+        );
+        final result = await agent.run('Task');
+        expect(result.stoppedReason, equals('completed'));
+        expect(client.capturedRequests, hasLength(2));
+      });
+
+      test(
+        'terminal tool among multiple tool calls in same iteration '
+        'stops the loop',
+        () async {
+          final client = _FakeClient([
+            _toolCallResponse(toolCalls: [
+              _toolCall(name: 'search', id: 'c1'),
+              _toolCall(name: 'submit', id: 'c2'),
+            ]),
+            // Should never be reached.
+            _textResponse(content: 'unreachable'),
+          ]);
+          final agent = ReActAgent(
+            name: 'react',
+            client: client,
+            config: _silentConfig(),
+            toolHandlers: {
+              'search': (args) async => 'results',
+              'submit': (args) async => 'submitted',
+            },
+            terminalTools: {'submit'},
+            maxIterations: 10,
+          );
+          final result = await agent.run('Task');
+          expect(result.stoppedReason, equals('terminal_tool'));
+          expect(result.toolCallsMade, hasLength(2));
+          expect(client.capturedRequests, hasLength(1));
+        },
+      );
+
+      test(
+        'all tool handlers in the iteration are executed even when '
+        'one is terminal',
+        () async {
+          final executedTools = <String>[];
+          final client = _FakeClient([
+            _toolCallResponse(toolCalls: [
+              _toolCall(name: 'gather', id: 'c1'),
+              _toolCall(name: 'submit', id: 'c2'),
+            ]),
+          ]);
+          final agent = ReActAgent(
+            name: 'react',
+            client: client,
+            config: _silentConfig(),
+            toolHandlers: {
+              'gather': (args) async {
+                executedTools.add('gather');
+                return 'gathered';
+              },
+              'submit': (args) async {
+                executedTools.add('submit');
+                return 'submitted';
+              },
+            },
+            terminalTools: {'submit'},
+            maxIterations: 10,
+          );
+          await agent.run('Task');
+          expect(executedTools, equals(['gather', 'submit']));
+        },
+      );
+
+      test(
+        'normal iterations followed by terminal tool stops correctly',
+        () async {
+          final client = _FakeClient([
+            _toolCallResponse(
+              toolCalls: [_toolCall(name: 'search', id: 'c1')],
+            ),
+            _toolCallResponse(
+              toolCalls: [_toolCall(name: 'analyze', id: 'c2')],
+            ),
+            _toolCallResponse(
+              toolCalls: [_toolCall(name: 'submit', id: 'c3')],
+            ),
+            // Should not be reached.
+            _textResponse(content: 'unreachable'),
+          ]);
+          final agent = ReActAgent(
+            name: 'react',
+            client: client,
+            config: _silentConfig(),
+            toolHandlers: {
+              'search': (args) async => 'found',
+              'analyze': (args) async => 'analyzed',
+              'submit': (args) async => 'submitted',
+            },
+            terminalTools: {'submit'},
+            maxIterations: 10,
+          );
+          final result = await agent.run('Task');
+          expect(result.stoppedReason, equals('terminal_tool'));
+          expect(client.capturedRequests, hasLength(3));
+          expect(result.toolCallsMade, hasLength(3));
+        },
+      );
+
+      test('tokensUsed accumulates up to the terminal tool iteration',
+          () async {
+        final client = _FakeClient([
+          _toolCallResponse(
+            toolCalls: [_toolCall(name: 'search', id: 'c1')],
+            promptTokens: 10,
+            completionTokens: 5,
+          ),
+          _toolCallResponse(
+            toolCalls: [_toolCall(name: 'submit', id: 'c2')],
+            promptTokens: 20,
+            completionTokens: 10,
+          ),
+        ]);
+        final agent = ReActAgent(
+          name: 'react',
+          client: client,
+          config: _silentConfig(),
+          toolHandlers: {
+            'search': (args) async => 'found',
+            'submit': (args) async => 'done',
+          },
+          terminalTools: {'submit'},
+          maxIterations: 10,
+        );
+        final result = await agent.run('Task');
+        expect(result.tokensUsed, equals(45)); // 15 + 30
+      });
+
+      test('empty terminalTools set has no effect on normal flow', () async {
+        final client = _FakeClient([
+          _toolCallResponse(
+            toolCalls: [_toolCall(name: 'my_tool')],
+          ),
+          _textResponse(content: 'Done'),
+        ]);
+        final agent = ReActAgent(
+          name: 'react',
+          client: client,
+          config: _silentConfig(),
+          toolHandlers: {
+            'my_tool': (args) async => 'result',
+          },
+          terminalTools: {},
+          maxIterations: 10,
+        );
+        final result = await agent.run('Task');
+        expect(result.stoppedReason, equals('completed'));
+      });
+    });
   });
 }

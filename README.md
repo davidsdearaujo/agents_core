@@ -148,6 +148,35 @@ Future<void> main() async {
 }
 ```
 
+#### Terminal tools
+
+Some workflows use a dedicated tool (e.g. `submit_result`) whose invocation *is*
+the final answer — the agent should stop immediately after executing it rather
+than sending another request to the LLM. Pass the `terminalTools` parameter to
+declare which tool names have this behaviour:
+
+```dart
+final agent = ReActAgent(
+  name: 'solver',
+  client: client,
+  config: config,
+  model: 'llama-3-8b',
+  systemPrompt: 'Solve the task and call submit_result with the answer.',
+  tools: [submitResultTool],
+  toolHandlers: {
+    'submit_result': (args) async => args['answer'] as String,
+  },
+  terminalTools: {'submit_result'},
+);
+
+final result = await agent.run('What is 2 + 2?');
+print(result.stoppedReason); // "terminal_tool"
+```
+
+When a terminal tool is called the tool executes normally, its result is
+appended to the conversation, and the loop breaks with
+`stoppedReason: "terminal_tool"`. Defaults to an empty set (no terminal tools).
+
 ### Multi-agent pipeline (Orchestrator)
 
 Chain agents together in a sequential pipeline. Steps can be single-agent
@@ -356,7 +385,7 @@ Future<void> main() async {
 
   final result = await agent.run('Summarise the workspace files.');
   print(result.output);
-  print(result.stoppedReason); // "completed", "loop_detected", etc.
+  print(result.stoppedReason); // "completed", "terminal_tool", "loop_detected", etc.
 
   client.dispose();
 }
