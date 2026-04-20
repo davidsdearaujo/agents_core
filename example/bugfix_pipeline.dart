@@ -94,8 +94,9 @@ const _fileTools = [readFileTool, writeFileTool, listFilesTool];
   ReActAgent fixReviewer,
   ReActAgent testWriter,
   ReActAgent prWriter,
-}) _createAgents({
-  required LmStudioClient client,
+})
+_createAgents({
+  required LlmClient client,
   required AgentsCoreConfig config,
   required FileContext context,
   required String model,
@@ -111,7 +112,8 @@ const _fileTools = [readFileTool, writeFileTool, listFilesTool];
     tools: _fileTools,
     toolHandlers: handlers,
     maxIterations: 5,
-    systemPrompt: 'You are a senior QA engineer specialising in bug triage. '
+    systemPrompt:
+        'You are a senior QA engineer specialising in bug triage. '
         'Given a raw bug report, produce a structured triage document with:\n'
         '- Severity (P0-P4)\n'
         '- Affected component\n'
@@ -131,7 +133,8 @@ const _fileTools = [readFileTool, writeFileTool, listFilesTool];
     tools: _fileTools,
     toolHandlers: handlers,
     maxIterations: 5,
-    systemPrompt: 'You are a senior software engineer investigating bugs. '
+    systemPrompt:
+        'You are a senior software engineer investigating bugs. '
         'Analyse the triage report and propose a root cause with supporting '
         'evidence. Structure your analysis as:\n'
         '- Root cause statement\n'
@@ -150,7 +153,8 @@ const _fileTools = [readFileTool, writeFileTool, listFilesTool];
     tools: _fileTools,
     toolHandlers: handlers,
     maxIterations: 5,
-    systemPrompt: 'You are a principal engineer validating root cause analyses. '
+    systemPrompt:
+        'You are a principal engineer validating root cause analyses. '
         'Review the proposed root cause against the triage report. Check:\n'
         '- Is the hypothesis consistent with all symptoms?\n'
         '- Are there alternative explanations?\n'
@@ -169,7 +173,8 @@ const _fileTools = [readFileTool, writeFileTool, listFilesTool];
     tools: _fileTools,
     toolHandlers: handlers,
     maxIterations: 5,
-    systemPrompt: 'You are a senior Dart developer writing targeted bugfixes. '
+    systemPrompt:
+        'You are a senior Dart developer writing targeted bugfixes. '
         'Given a root cause analysis and triage, write a minimal fix that:\n'
         '- Addresses the root cause directly\n'
         '- Has minimal scope (no unrelated refactors)\n'
@@ -187,7 +192,8 @@ const _fileTools = [readFileTool, writeFileTool, listFilesTool];
     tools: _fileTools,
     toolHandlers: handlers,
     maxIterations: 5,
-    systemPrompt: 'You are a strict code reviewer for bugfix PRs. '
+    systemPrompt:
+        'You are a strict code reviewer for bugfix PRs. '
         'Evaluate the fix against the root cause and triage. Check:\n'
         '- Does the fix actually address the root cause?\n'
         '- Is the scope minimal (no unnecessary changes)?\n'
@@ -206,7 +212,8 @@ const _fileTools = [readFileTool, writeFileTool, listFilesTool];
     tools: _fileTools,
     toolHandlers: handlers,
     maxIterations: 5,
-    systemPrompt: 'You are a QA engineer writing regression tests in Dart. '
+    systemPrompt:
+        'You are a QA engineer writing regression tests in Dart. '
         'Given a bugfix and its root cause, write unit tests that:\n'
         '- Reproduce the original bug (test should fail without the fix)\n'
         '- Verify the fix works correctly\n'
@@ -224,7 +231,8 @@ const _fileTools = [readFileTool, writeFileTool, listFilesTool];
     tools: _fileTools,
     toolHandlers: handlers,
     maxIterations: 5,
-    systemPrompt: 'You are a developer writing pull request descriptions. '
+    systemPrompt:
+        'You are a developer writing pull request descriptions. '
         'Read all workspace artifacts and produce a PR description with:\n'
         '- Title (concise, under 72 chars)\n'
         '- Summary (1-3 sentences)\n'
@@ -280,7 +288,8 @@ Orchestrator _buildPipeline({
       // The ReActAgent writes triage.md to the workspace via file-context tools.
       AgentStep(
         agent: triager,
-        taskPrompt: 'Triage the following bug report. Produce a structured '
+        taskPrompt:
+            'Triage the following bug report. Produce a structured '
             'analysis and save it to "$_triageFile" using the write_file tool.'
             '\n\n$_bugReport',
       ),
@@ -327,27 +336,30 @@ Orchestrator _buildPipeline({
         isAccepted: (AgentResult result, int iteration) {
           return result.output.trim().toUpperCase().startsWith('APPROVED');
         },
-        buildProducerPrompt: (
-          String originalTask,
-          FileContext ctx,
-          int iteration,
-          AgentResult? previousReview,
-        ) async {
-          if (iteration == 0) return originalTask;
+        buildProducerPrompt:
+            (
+              String originalTask,
+              FileContext ctx,
+              int iteration,
+              AgentResult? previousReview,
+            ) async {
+              if (iteration == 0) return originalTask;
 
-          final buffer = StringBuffer()
-            ..writeln(originalTask)
-            ..writeln()
-            ..writeln('---')
-            ..writeln('## Reviewer Feedback (iteration $iteration)')
-            ..writeln()
-            ..writeln(previousReview?.output ?? '')
-            ..writeln()
-            ..writeln('Address every issue above and produce the revised fix. '
-                'Save the updated code to "$_fixFile" using write_file.');
+              final buffer = StringBuffer()
+                ..writeln(originalTask)
+                ..writeln()
+                ..writeln('---')
+                ..writeln('## Reviewer Feedback (iteration $iteration)')
+                ..writeln()
+                ..writeln(previousReview?.output ?? '')
+                ..writeln()
+                ..writeln(
+                  'Address every issue above and produce the revised fix. '
+                  'Save the updated code to "$_fixFile" using write_file.',
+                );
 
-          return buffer.toString();
-        },
+              return buffer.toString();
+            },
         condition: (FileContext ctx) async => ctx.exists(_rootCauseFile),
       ),
 
@@ -422,10 +434,14 @@ void _printStepSummary(OrchestratorResult result) {
       // Per-iteration reviewer feedback summaries.
       final loopResult = stepResult.agentLoopResult;
       for (final iter in loopResult.iterations) {
-        print('    [${iter.index}] producer=${iter.producerResult.tokensUsed}'
-            ', reviewer=${iter.reviewerResult.tokensUsed} tokens');
-        print('         reviewer: '
-            '${_truncate(iter.reviewerResult.output, 80)}');
+        print(
+          '    [${iter.index}] producer=${iter.producerResult.tokensUsed}'
+          ', reviewer=${iter.reviewerResult.tokensUsed} tokens',
+        );
+        print(
+          '         reviewer: '
+          '${_truncate(iter.reviewerResult.output, 80)}',
+        );
       }
     }
 
@@ -437,8 +453,10 @@ void _printStepSummary(OrchestratorResult result) {
 void _printPipelineStats(OrchestratorResult result) {
   _printHeader('Pipeline Stats');
 
-  final totalTokens =
-      result.stepResults.fold<int>(0, (sum, r) => sum + r.tokensUsed);
+  final totalTokens = result.stepResults.fold<int>(
+    0,
+    (sum, r) => sum + r.tokensUsed,
+  );
 
   print('Duration:     ${_formatDuration(result.duration)}');
   print('Total tokens: $totalTokens');

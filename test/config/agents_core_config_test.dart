@@ -24,7 +24,10 @@ void main() {
 
       test('default lmStudioBaseUrl is http://localhost:1234', () {
         final config = AgentsCoreConfig();
-        expect(config.lmStudioBaseUrl, equals(Uri.parse('http://localhost:1234')));
+        expect(
+          config.lmStudioBaseUrl,
+          equals(Uri.parse('http://localhost:1234')),
+        );
       });
 
       test('default requestTimeout is 60 seconds', () {
@@ -268,7 +271,9 @@ void main() {
         final config = AgentsCoreConfig(
           requestTimeout: const Duration(seconds: 10),
         );
-        final copy = config.copyWith(requestTimeout: const Duration(seconds: 120));
+        final copy = config.copyWith(
+          requestTimeout: const Duration(seconds: 120),
+        );
         expect(copy.requestTimeout, equals(const Duration(seconds: 120)));
       });
 
@@ -386,7 +391,10 @@ void main() {
 
       test('uses defaults when environment map is empty', () {
         final config = AgentsCoreConfig.fromEnvironment(environment: {});
-        expect(config.lmStudioBaseUrl, equals(Uri.parse('http://localhost:1234')));
+        expect(
+          config.lmStudioBaseUrl,
+          equals(Uri.parse('http://localhost:1234')),
+        );
         expect(config.requestTimeout, equals(const Duration(seconds: 60)));
         expect(config.defaultModel, isNotEmpty);
         expect(config.dockerImage, isNotEmpty);
@@ -453,13 +461,15 @@ void main() {
         expect(config.requestTimeout, equals(const Duration(seconds: 120)));
       });
 
-      test('ignores invalid AGENTS_REQUEST_TIMEOUT_SECONDS and uses default',
-          () {
-        final config = AgentsCoreConfig.fromEnvironment(
-          environment: {'AGENTS_REQUEST_TIMEOUT_SECONDS': 'not-a-number'},
-        );
-        expect(config.requestTimeout, equals(const Duration(seconds: 60)));
-      });
+      test(
+        'ignores invalid AGENTS_REQUEST_TIMEOUT_SECONDS and uses default',
+        () {
+          final config = AgentsCoreConfig.fromEnvironment(
+            environment: {'AGENTS_REQUEST_TIMEOUT_SECONDS': 'not-a-number'},
+          );
+          expect(config.requestTimeout, equals(const Duration(seconds: 60)));
+        },
+      );
 
       test('reads all environment variables together', () {
         final config = AgentsCoreConfig.fromEnvironment(
@@ -491,23 +501,23 @@ void main() {
         expect(config.logger, isA<SilentLogger>());
       });
 
-      test('environment map overrides constructor-default but not explicit logger', () {
-        // Logger passed explicitly should win over any env default.
-        const explicit = StderrLogger(level: LogLevel.debug);
-        final config = AgentsCoreConfig.fromEnvironment(
-          environment: {},
-          logger: explicit,
-        );
-        expect(config.logger.level, equals(LogLevel.debug));
-      });
+      test(
+        'environment map overrides constructor-default but not explicit logger',
+        () {
+          // Logger passed explicitly should win over any env default.
+          const explicit = StderrLogger(level: LogLevel.debug);
+          final config = AgentsCoreConfig.fromEnvironment(
+            environment: {},
+            logger: explicit,
+          );
+          expect(config.logger.level, equals(LogLevel.debug));
+        },
+      );
 
       test('uses Platform.environment when no environment map is provided', () {
         // Cannot control Platform.environment in a unit test, so we just
         // verify no exception is thrown and a valid config is returned.
-        expect(
-          () => AgentsCoreConfig.fromEnvironment(),
-          returnsNormally,
-        );
+        expect(() => AgentsCoreConfig.fromEnvironment(), returnsNormally);
         final config = AgentsCoreConfig.fromEnvironment();
         expect(config, isA<AgentsCoreConfig>());
       });
@@ -649,11 +659,14 @@ void main() {
         expect(a.hashCode, equals(b.hashCode));
       });
 
-      test('configs with different apiKey usually have different hashCodes', () {
-        final a = AgentsCoreConfig(apiKey: 'hash-key-a');
-        final b = AgentsCoreConfig(apiKey: 'hash-key-b');
-        expect(a.hashCode, isNot(equals(b.hashCode)));
-      });
+      test(
+        'configs with different apiKey usually have different hashCodes',
+        () {
+          final a = AgentsCoreConfig(apiKey: 'hash-key-a');
+          final b = AgentsCoreConfig(apiKey: 'hash-key-b');
+          expect(a.hashCode, isNot(equals(b.hashCode)));
+        },
+      );
 
       // toString
       test('toString returns a non-empty string', () {

@@ -1,11 +1,16 @@
 import 'dart:convert';
 
+import 'package:meta/meta.dart';
+
 import '../config/agents_core_config.dart';
+import '../config/lm_studio_config.dart';
 import '../models/chat_completion_chunk.dart';
 import '../models/chat_completion_request.dart';
 import '../models/chat_completion_response.dart';
 import '../models/completion.dart';
 import '../models/lm_model.dart';
+import '../utils/disposable.dart';
+import 'llm_client.dart';
 import 'lm_studio_http_client.dart';
 
 /// High-level client for the LM Studio OpenAI-compatible API.
@@ -40,16 +45,38 @@ import 'lm_studio_http_client.dart';
 ///
 /// client.dispose();
 /// ```
-class LmStudioClient {
+class LmStudioClient with Disposable implements LlmClient {
   /// Creates an [LmStudioClient] configured from [config].
   ///
   /// Optionally accepts an existing [httpClient] for testing or reuse.
   /// If omitted, a new [LmStudioHttpClient] is created from [config].
-  LmStudioClient(
-    AgentsCoreConfig config, {
-    LmStudioHttpClient? httpClient,
-  })  : _config = config,
-        _httpClient = httpClient ?? LmStudioHttpClient(config: config);
+  LmStudioClient(AgentsCoreConfig config, {LmStudioHttpClient? httpClient})
+    : _config = config,
+      _httpClient = httpClient ?? LmStudioHttpClient(config: config);
+
+  /// Creates an [LmStudioClient] configured from a specialised
+  /// [LmStudioConfig].
+  ///
+  /// This is the preferred constructor when the consumer has already built
+  /// an [LmStudioConfig] independently.
+  ///
+  /// ```dart
+  /// final client = LmStudioClient.fromLmStudioConfig(
+  ///   LmStudioConfig(
+  ///     baseUrl: Uri.parse('http://localhost:1234'),
+  ///     defaultModel: 'llama-3-8b',
+  ///   ),
+  /// );
+  /// ```
+  factory LmStudioClient.fromLmStudioConfig(LmStudioConfig lmStudioConfig) {
+    final config = AgentsCoreConfig(
+      lmStudioBaseUrl: lmStudioConfig.baseUrl,
+      defaultModel: lmStudioConfig.defaultModel,
+      requestTimeout: lmStudioConfig.requestTimeout,
+      apiKey: lmStudioConfig.apiKey,
+    );
+    return LmStudioClient(config);
+  }
 
   final AgentsCoreConfig _config;
   final LmStudioHttpClient _httpClient;
@@ -83,6 +110,7 @@ class LmStudioClient {
   /// final response = await client.chatCompletion(request);
   /// print(response.choices.first.message.content);
   /// ```
+  @override
   Future<ChatCompletionResponse> chatCompletion(
     ChatCompletionRequest request,
   ) async {
@@ -107,6 +135,7 @@ class LmStudioClient {
   ///   if (content != null) stdout.write(content);
   /// }
   /// ```
+  @override
   Stream<ChatCompletionChunk> chatCompletionStream(
     ChatCompletionRequest request,
   ) {
@@ -115,8 +144,7 @@ class LmStudioClient {
 
     return _httpClient
         .postStream('/v1/chat/completions', body)
-        .map((data) =>
-            json.decode(data) as Map<String, dynamic>)
+        .map((data) => json.decode(data) as Map<String, dynamic>)
         .map(ChatCompletionChunk.fromJson);
   }
 
@@ -130,6 +158,7 @@ class LmStudioClient {
   ///   stdout.write(text);
   /// }
   /// ```
+  @override
   Stream<String> chatCompletionStreamText(ChatCompletionRequest request) {
     return chatCompletionStream(request)
         .map((chunk) => chunk.choices.first.delta.content)
@@ -149,10 +178,7 @@ class LmStudioClient {
   /// ```
   Future<CompletionResponse> completion(CompletionRequest request) async {
     _config.logger.debug('Text completion: model=${request.model}');
-    final json = await _httpClient.post(
-      '/v1/completions',
-      request.toJson(),
-    );
+    final json = await _httpClient.post('/v1/completions', request.toJson());
     return CompletionResponse.fromJson(json);
   }
 
@@ -164,16 +190,13 @@ class LmStudioClient {
   ///
   /// For chat-style streaming with typed objects, use
   /// [chatCompletionStream] instead.
-  Stream<Map<String, dynamic>> completionStream(
-    CompletionRequest request,
-  ) {
+  Stream<Map<String, dynamic>> completionStream(CompletionRequest request) {
     _config.logger.debug('Text completion stream: model=${request.model}');
     final body = request.toJson()..['stream'] = true;
 
     return _httpClient
         .postStream('/v1/completions', body)
-        .map((data) =>
-            json.decode(data) as Map<String, dynamic>);
+        .map((data) => json.decode(data) as Map<String, dynamic>);
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -181,9 +204,13 @@ class LmStudioClient {
   /// Closes the underlying HTTP client and frees its resources.
   ///
   /// After calling [dispose], no further requests can be made with
-  /// this instance.
+  /// this instance. Subsequent calls are a no-op.
+  @override
+  @mustCallSuper
   void dispose() {
+    if (isDisposed) return;
     _config.logger.debug('Disposing LmStudioClient');
     _httpClient.dispose();
+    super.dispose();
   }
 }

@@ -35,8 +35,7 @@ Future<_RawResponse> _request(
 
     final response = await req.close();
     final responseBody = await response.transform(utf8.decoder).join();
-    final contentType = response.headers
-        .value(HttpHeaders.contentTypeHeader);
+    final contentType = response.headers.value(HttpHeaders.contentTypeHeader);
 
     return _RawResponse(
       statusCode: response.statusCode,
@@ -52,10 +51,7 @@ Future<_RawResponse> _request(
 ///
 /// Returns all `data: ` payload strings (with prefix stripped), **excluding**
 /// the `[DONE]` sentinel.
-Future<List<String>> _readSse(
-  String url, {
-  Map<String, dynamic>? body,
-}) async {
+Future<List<String>> _readSse(String url, {Map<String, dynamic>? body}) async {
   final uri = Uri.parse(url);
   final client = HttpClient();
   try {
@@ -69,9 +65,8 @@ Future<List<String>> _readSse(
     final response = await req.close();
     final chunks = <String>[];
 
-    await for (final line in response
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())) {
+    await for (final line
+        in response.transform(utf8.decoder).transform(const LineSplitter())) {
       if (line.startsWith('data: ')) {
         final data = line.substring(6);
         if (data == '[DONE]') break;
@@ -143,28 +138,24 @@ void main() {
   // ───────────────────────────────────────────────────────────────────────────
   group('JSON response stubs', () {
     test('enqueued JSON stub is returned with status 200', () async {
-      server.enqueue(
-        response: MockResponse.json(body: {'ok': true}),
-      );
+      server.enqueue(response: MockResponse.json(body: {'ok': true}));
       final res = await _request('${server.baseUrl}/v1/models');
       expect(res.statusCode, equals(200));
     });
 
     test('enqueued JSON stub body is returned verbatim', () async {
       server.enqueue(
-        response: MockResponse.json(
-          body: {'id': 'cmpl-1', 'choices': []},
-        ),
+        response: MockResponse.json(body: {'id': 'cmpl-1', 'choices': []}),
       );
-      final res = await _request('${server.baseUrl}/v1/chat/completions',
-          method: 'POST');
+      final res = await _request(
+        '${server.baseUrl}/v1/chat/completions',
+        method: 'POST',
+      );
       expect(res.jsonBody, equals({'id': 'cmpl-1', 'choices': []}));
     });
 
     test('content-type is application/json for JSON stubs', () async {
-      server.enqueue(
-        response: MockResponse.json(body: {'x': 1}),
-      );
+      server.enqueue(response: MockResponse.json(body: {'x': 1}));
       final res = await _request('${server.baseUrl}/v1/models');
       expect(res.contentType, contains('application/json'));
     });
@@ -173,8 +164,10 @@ void main() {
       server.enqueue(
         response: MockResponse.json(statusCode: 201, body: {'created': true}),
       );
-      final res = await _request('${server.baseUrl}/v1/resource',
-          method: 'POST');
+      final res = await _request(
+        '${server.baseUrl}/v1/resource',
+        method: 'POST',
+      );
       expect(res.statusCode, equals(201));
     });
   });
@@ -189,12 +182,14 @@ void main() {
           response: MockResponse.error(
             statusCode: code,
             body: {
-              'error': {'type': 'test_error', 'message': 'error $code'}
+              'error': {'type': 'test_error', 'message': 'error $code'},
             },
           ),
         );
-        final res = await _request('${server.baseUrl}/v1/chat/completions',
-            method: 'POST');
+        final res = await _request(
+          '${server.baseUrl}/v1/chat/completions',
+          method: 'POST',
+        );
         expect(res.statusCode, equals(code));
       });
 
@@ -203,12 +198,14 @@ void main() {
           response: MockResponse.error(
             statusCode: code,
             body: {
-              'error': {'type': 'test_error', 'message': 'err'}
+              'error': {'type': 'test_error', 'message': 'err'},
             },
           ),
         );
-        final res = await _request('${server.baseUrl}/v1/chat/completions',
-            method: 'POST');
+        final res = await _request(
+          '${server.baseUrl}/v1/chat/completions',
+          method: 'POST',
+        );
         expect(res.jsonBody, contains('error'));
       });
     }
@@ -242,8 +239,7 @@ void main() {
           ],
         ),
       );
-      final chunks =
-          await _readSse('${server.baseUrl}/v1/chat/completions');
+      final chunks = await _readSse('${server.baseUrl}/v1/chat/completions');
       expect(chunks, hasLength(2));
     });
 
@@ -251,12 +247,17 @@ void main() {
       server.enqueue(
         response: MockResponse.sse(
           chunks: [
-            {'choices': [{'delta': {'content': 'Hi'}}]},
+            {
+              'choices': [
+                {
+                  'delta': {'content': 'Hi'},
+                },
+              ],
+            },
           ],
         ),
       );
-      final chunks =
-          await _readSse('${server.baseUrl}/v1/chat/completions');
+      final chunks = await _readSse('${server.baseUrl}/v1/chat/completions');
       expect(chunks, hasLength(1));
       final parsed = json.decode(chunks.first) as Map<String, dynamic>;
       expect(parsed, contains('choices'));
@@ -272,8 +273,7 @@ void main() {
           ],
         ),
       );
-      final chunks =
-          await _readSse('${server.baseUrl}/v1/chat/completions');
+      final chunks = await _readSse('${server.baseUrl}/v1/chat/completions');
       final seqs = chunks
           .map((c) => (json.decode(c) as Map<String, dynamic>)['seq'] as int)
           .toList();
@@ -282,24 +282,22 @@ void main() {
 
     test('SSE [DONE] sentinel is appended and terminates the stream', () async {
       server.enqueue(
-        response: MockResponse.sse(chunks: [
-          {'delta': 'A'},
-        ]),
+        response: MockResponse.sse(
+          chunks: [
+            {'delta': 'A'},
+          ],
+        ),
       );
       // _readSse stops at [DONE] and does NOT include it.
-      final chunks =
-          await _readSse('${server.baseUrl}/v1/chat/completions');
+      final chunks = await _readSse('${server.baseUrl}/v1/chat/completions');
       // Exactly 1 chunk (not 2 — [DONE] must not bleed through)
       expect(chunks, hasLength(1));
       expect(chunks.first, isNot(equals('[DONE]')));
     });
 
     test('empty SSE chunk list produces only [DONE]', () async {
-      server.enqueue(
-        response: MockResponse.sse(chunks: []),
-      );
-      final chunks =
-          await _readSse('${server.baseUrl}/v1/chat/completions');
+      server.enqueue(response: MockResponse.sse(chunks: []));
+      final chunks = await _readSse('${server.baseUrl}/v1/chat/completions');
       expect(chunks, isEmpty);
     });
   });
@@ -343,10 +341,10 @@ void main() {
         method: 'POST',
         body: {'model': 'llama3', 'messages': []},
       );
-      expect(server.requests.first.jsonBody, equals({
-        'model': 'llama3',
-        'messages': [],
-      }));
+      expect(
+        server.requests.first.jsonBody,
+        equals({'model': 'llama3', 'messages': []}),
+      );
     });
 
     test('GET request has empty body string', () async {
@@ -410,19 +408,14 @@ void main() {
     });
 
     test('stub with method=null (wildcard) matches GET', () async {
-      server.enqueue(
-        response: MockResponse.json(body: {'ok': true}),
-      );
+      server.enqueue(response: MockResponse.json(body: {'ok': true}));
       final res = await _request('${server.baseUrl}/anything');
       expect(res.statusCode, equals(200));
     });
 
     test('stub with method=null (wildcard) matches POST', () async {
-      server.enqueue(
-        response: MockResponse.json(body: {'ok': true}),
-      );
-      final res =
-          await _request('${server.baseUrl}/anything', method: 'POST');
+      server.enqueue(response: MockResponse.json(body: {'ok': true}));
+      final res = await _request('${server.baseUrl}/anything', method: 'POST');
       expect(res.statusCode, equals(200));
     });
   });
@@ -437,8 +430,10 @@ void main() {
         response: MockResponse.json(body: {'matched': 'models'}),
       );
       // Wrong path — no match → 500
-      final wrongPath =
-          await _request('${server.baseUrl}/v1/chat/completions', method: 'POST');
+      final wrongPath = await _request(
+        '${server.baseUrl}/v1/chat/completions',
+        method: 'POST',
+      );
       expect(wrongPath.statusCode, equals(500));
       // Correct path — matches
       server.enqueue(
@@ -450,9 +445,7 @@ void main() {
     });
 
     test('stub with path=null (wildcard) matches any path', () async {
-      server.enqueue(
-        response: MockResponse.json(body: {'wildcard': true}),
-      );
+      server.enqueue(response: MockResponse.json(body: {'wildcard': true}));
       final res = await _request('${server.baseUrl}/whatever/path/you/want');
       expect(res.statusCode, equals(200));
     });
@@ -469,8 +462,9 @@ void main() {
         response: MockResponse.json(body: {'ok': true}),
       );
       // GET to the right path — should NOT match (wrong method)
-      final wrongMethod =
-          await _request('${server.baseUrl}/v1/chat/completions');
+      final wrongMethod = await _request(
+        '${server.baseUrl}/v1/chat/completions',
+      );
       expect(wrongMethod.statusCode, equals(500));
 
       // PUT back the stub (was not consumed)
@@ -480,8 +474,10 @@ void main() {
         response: MockResponse.json(body: {'ok': true}),
       );
       // POST to wrong path — should NOT match
-      final wrongPath =
-          await _request('${server.baseUrl}/v1/models', method: 'POST');
+      final wrongPath = await _request(
+        '${server.baseUrl}/v1/models',
+        method: 'POST',
+      );
       expect(wrongPath.statusCode, equals(500));
 
       // PUT back and send the correct combo
@@ -518,8 +514,7 @@ void main() {
     });
 
     test('each stub is consumed exactly once', () async {
-      server.enqueue(
-          response: MockResponse.json(body: {'n': 1}));
+      server.enqueue(response: MockResponse.json(body: {'n': 1}));
       await _request('${server.baseUrl}/v1/models');
       // Second request — no more stubs → 500
       final res = await _request('${server.baseUrl}/v1/models');
@@ -553,14 +548,17 @@ void main() {
       expect(res.body, contains('/v1/models'));
     });
 
-    test('500 fallback body contains the method in the error message', () async {
-      final res = await _request(
-        '${server.baseUrl}/v1/models',
-        method: 'POST',
-        body: {},
-      );
-      expect(res.body, contains('POST'));
-    });
+    test(
+      '500 fallback body contains the method in the error message',
+      () async {
+        final res = await _request(
+          '${server.baseUrl}/v1/models',
+          method: 'POST',
+          body: {},
+        );
+        expect(res.body, contains('POST'));
+      },
+    );
 
     test('request is still recorded even when no stub matches', () async {
       await _request('${server.baseUrl}/v1/models');
@@ -614,9 +612,11 @@ void main() {
     });
 
     test('MockResponse.sse has statusCode 200 and chunks', () {
-      final r = MockResponse.sse(chunks: [
-        {'delta': 'hi'}
-      ]);
+      final r = MockResponse.sse(
+        chunks: [
+          {'delta': 'hi'},
+        ],
+      );
       expect(r.statusCode, equals(200));
       expect(r.sseChunks, hasLength(1));
       expect(r.jsonBody, isNull);

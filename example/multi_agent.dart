@@ -43,7 +43,8 @@ Future<void> main() async {
       client: client,
       config: config,
       model: 'llama-3-8b',
-      systemPrompt: 'You are a research analyst. '
+      systemPrompt:
+          'You are a research analyst. '
           'Produce structured outlines with key points. '
           'Use bullet points and section headers.',
     );
@@ -67,7 +68,8 @@ Future<void> main() async {
       client: client,
       config: config,
       model: 'llama-3-8b',
-      systemPrompt: 'You are a technical writer. '
+      systemPrompt:
+          'You are a technical writer. '
           'Expand outlines into well-written articles. '
           'Use clear language and concrete examples.',
     );

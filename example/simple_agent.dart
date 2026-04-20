@@ -37,7 +37,8 @@ Future<void> main() async {
       client: client,
       config: config,
       model: 'llama-3-8b',
-      systemPrompt: 'You are a technical writer. '
+      systemPrompt:
+          'You are a technical writer. '
           'Write clear, concise documentation. '
           'Use Markdown formatting.',
     );

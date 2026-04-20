@@ -5,62 +5,12 @@ import 'dart:io';
 import 'package:agents_core/agents_core.dart';
 import 'package:test/test.dart';
 
+import '../helpers/fake_agents.dart';
+import '../helpers/mock_llm_client.dart';
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/// A fake [Agent] whose [run] method returns from a queue of results (or
-/// throws from a queue of errors).
-///
-/// Tracks call count, captured tasks, and captured contexts for assertions.
-class _FakeAgent extends Agent {
-  _FakeAgent({
-    super.name = 'fake',
-    List<AgentResult>? results,
-    List<Object>? errors,
-  }) : _results = results ?? const [],
-       _errors = errors ?? const [],
-       super(
-         client: LmStudioClient(AgentsCoreConfig(logger: const SilentLogger())),
-         config: AgentsCoreConfig(logger: const SilentLogger()),
-       );
-
-  /// Convenience: create a fake that always returns the same result.
-  _FakeAgent.single({
-    String name = 'fake',
-    AgentResult result = const AgentResult(output: 'fake output'),
-  }) : this(name: name, results: [result]);
-
-  /// Convenience: create a fake that always throws the same error.
-  _FakeAgent.throwing({String name = 'fake', required Object error})
-    : this(name: name, errors: [error]);
-
-  final List<AgentResult> _results;
-  final List<Object> _errors;
-
-  final List<String> capturedTasks = [];
-  final List<FileContext?> capturedContexts = [];
-  int callCount = 0;
-
-  @override
-  Future<AgentResult> run(String task, {FileContext? context}) async {
-    final index = callCount;
-    callCount++;
-    capturedTasks.add(task);
-    capturedContexts.add(context);
-
-    // If there are errors queued for this index, throw them.
-    if (_errors.isNotEmpty && index < _errors.length) {
-      throw _errors[index];
-    }
-
-    // Return from the results queue, or default.
-    if (_results.isNotEmpty) {
-      return _results[index % _results.length];
-    }
-    return const AgentResult(output: 'fake output');
-  }
-}
 
 /// Creates a [FileContext] backed by a temp directory.
 ({FileContext ctx, Directory dir}) _tempContext() {
@@ -267,15 +217,19 @@ void main() {
       },
     );
 
-    test('reachedMaxIterations is true when accepted is false', () {
-      final result = AgentLoopResult(
-        iterations: [],
-        accepted: false,
-        duration: Duration.zero,
-        totalTokensUsed: 0,
-      );
-      expect(result.reachedMaxIterations, isTrue);
-    });
+    test(
+      'reachedMaxIterations is true when stoppedReason is maxIterations',
+      () {
+        final result = AgentLoopResult(
+          iterations: [],
+          accepted: false,
+          duration: Duration.zero,
+          totalTokensUsed: 0,
+          stoppedReason: AgentStopReason.maxIterations,
+        );
+        expect(result.reachedMaxIterations, isTrue);
+      },
+    );
 
     test('reachedMaxIterations is false when accepted is true', () {
       final result = AgentLoopResult(
@@ -306,8 +260,8 @@ void main() {
       expect(
         () => AgentLoop(
           context: ctx,
-          producer: _FakeAgent(name: 'producer'),
-          reviewer: _FakeAgent(name: 'reviewer'),
+          producer: FakeAgent(name: 'producer'),
+          reviewer: FakeAgent(name: 'reviewer'),
           isAccepted: (result, iteration) => true,
         ),
         returnsNormally,
@@ -317,29 +271,29 @@ void main() {
     test('exposes context', () {
       final loop = AgentLoop(
         context: ctx,
-        producer: _FakeAgent(name: 'producer'),
-        reviewer: _FakeAgent(name: 'reviewer'),
+        producer: FakeAgent(name: 'producer'),
+        reviewer: FakeAgent(name: 'reviewer'),
         isAccepted: (result, iteration) => true,
       );
       expect(loop.context, same(ctx));
     });
 
     test('exposes producer agent', () {
-      final producer = _FakeAgent(name: 'my-producer');
+      final producer = FakeAgent(name: 'my-producer');
       final loop = AgentLoop(
         context: ctx,
         producer: producer,
-        reviewer: _FakeAgent(name: 'reviewer'),
+        reviewer: FakeAgent(name: 'reviewer'),
         isAccepted: (result, iteration) => true,
       );
       expect(loop.producer, same(producer));
     });
 
     test('exposes reviewer agent', () {
-      final reviewer = _FakeAgent(name: 'my-reviewer');
+      final reviewer = FakeAgent(name: 'my-reviewer');
       final loop = AgentLoop(
         context: ctx,
-        producer: _FakeAgent(name: 'producer'),
+        producer: FakeAgent(name: 'producer'),
         reviewer: reviewer,
         isAccepted: (result, iteration) => true,
       );
@@ -349,8 +303,8 @@ void main() {
     test('maxIterations defaults to 5', () {
       final loop = AgentLoop(
         context: ctx,
-        producer: _FakeAgent(name: 'producer'),
-        reviewer: _FakeAgent(name: 'reviewer'),
+        producer: FakeAgent(name: 'producer'),
+        reviewer: FakeAgent(name: 'reviewer'),
         isAccepted: (result, iteration) => true,
       );
       expect(loop.maxIterations, 5);
@@ -359,8 +313,8 @@ void main() {
     test('maxIterations can be set to custom value', () {
       final loop = AgentLoop(
         context: ctx,
-        producer: _FakeAgent(name: 'producer'),
-        reviewer: _FakeAgent(name: 'reviewer'),
+        producer: FakeAgent(name: 'producer'),
+        reviewer: FakeAgent(name: 'reviewer'),
         isAccepted: (result, iteration) => true,
         maxIterations: 10,
       );
@@ -371,8 +325,8 @@ void main() {
       expect(
         () => AgentLoop(
           context: ctx,
-          producer: _FakeAgent(name: 'producer'),
-          reviewer: _FakeAgent(name: 'reviewer'),
+          producer: FakeAgent(name: 'producer'),
+          reviewer: FakeAgent(name: 'reviewer'),
           isAccepted: (result, iteration) => true,
           buildProducerPrompt: (task, ctx, iter, prev) async => task,
         ),
@@ -384,8 +338,8 @@ void main() {
       expect(
         () => AgentLoop(
           context: ctx,
-          producer: _FakeAgent(name: 'producer'),
-          reviewer: _FakeAgent(name: 'reviewer'),
+          producer: FakeAgent(name: 'producer'),
+          reviewer: FakeAgent(name: 'reviewer'),
           isAccepted: (result, iteration) => true,
           buildReviewerPrompt: (task, ctx, iter, pr) async => 'review',
         ),
@@ -411,11 +365,11 @@ void main() {
     test(
       'runs producer then reviewer once when accepted immediately',
       () async {
-        final producer = _FakeAgent.single(
+        final producer = FakeAgent.single(
           name: 'producer',
           result: const AgentResult(output: 'code', tokensUsed: 100),
         );
-        final reviewer = _FakeAgent.single(
+        final reviewer = FakeAgent.single(
           name: 'reviewer',
           result: const AgentResult(output: 'LGTM', tokensUsed: 50),
         );
@@ -448,11 +402,11 @@ void main() {
           tokensUsed: 100,
         );
 
-        final producer = _FakeAgent.single(
+        final producer = FakeAgent.single(
           name: 'producer',
           result: producerResult,
         );
-        final reviewer = _FakeAgent.single(
+        final reviewer = FakeAgent.single(
           name: 'reviewer',
           result: reviewerResult,
         );
@@ -478,8 +432,8 @@ void main() {
     );
 
     test('passes original task to producer on iteration 0', () async {
-      final producer = _FakeAgent.single(name: 'producer');
-      final reviewer = _FakeAgent.single(name: 'reviewer');
+      final producer = FakeAgent.single(name: 'producer');
+      final reviewer = FakeAgent.single(name: 'reviewer');
 
       final loop = AgentLoop(
         context: ctx,
@@ -494,8 +448,8 @@ void main() {
     });
 
     test('passes FileContext to both producer and reviewer', () async {
-      final producer = _FakeAgent.single(name: 'producer');
-      final reviewer = _FakeAgent.single(name: 'reviewer');
+      final producer = FakeAgent.single(name: 'producer');
+      final reviewer = FakeAgent.single(name: 'reviewer');
 
       final loop = AgentLoop(
         context: ctx,
@@ -513,11 +467,11 @@ void main() {
     test(
       'builds default reviewer prompt from task and producer output',
       () async {
-        final producer = _FakeAgent.single(
+        final producer = FakeAgent.single(
           name: 'producer',
           result: const AgentResult(output: 'my code output'),
         );
-        final reviewer = _FakeAgent.single(name: 'reviewer');
+        final reviewer = FakeAgent.single(name: 'reviewer');
 
         final loop = AgentLoop(
           context: ctx,
@@ -552,7 +506,7 @@ void main() {
 
     test('loops until isAccepted returns true', () async {
       var acceptOnIteration = 2;
-      final producer = _FakeAgent(
+      final producer = FakeAgent(
         name: 'producer',
         results: [
           const AgentResult(output: 'v1', tokensUsed: 10),
@@ -560,7 +514,7 @@ void main() {
           const AgentResult(output: 'v3', tokensUsed: 30),
         ],
       );
-      final reviewer = _FakeAgent(
+      final reviewer = FakeAgent(
         name: 'reviewer',
         results: [
           const AgentResult(output: 'needs work', tokensUsed: 5),
@@ -585,14 +539,14 @@ void main() {
     });
 
     test('iteration indices are zero-based and sequential', () async {
-      final producer = _FakeAgent(
+      final producer = FakeAgent(
         name: 'producer',
         results: [
           const AgentResult(output: 'v1'),
           const AgentResult(output: 'v2'),
         ],
       );
-      final reviewer = _FakeAgent(
+      final reviewer = FakeAgent(
         name: 'reviewer',
         results: [
           const AgentResult(output: 'no'),
@@ -616,14 +570,14 @@ void main() {
     test(
       'default producer prompt on iteration 1+ includes reviewer feedback',
       () async {
-        final producer = _FakeAgent(
+        final producer = FakeAgent(
           name: 'producer',
           results: [
             const AgentResult(output: 'v1'),
             const AgentResult(output: 'v2'),
           ],
         );
-        final reviewer = _FakeAgent(
+        final reviewer = FakeAgent(
           name: 'reviewer',
           results: [
             const AgentResult(output: 'Fix the off-by-one error'),
@@ -653,14 +607,14 @@ void main() {
     );
 
     test('totalTokensUsed sums all producer and reviewer tokens', () async {
-      final producer = _FakeAgent(
+      final producer = FakeAgent(
         name: 'producer',
         results: [
           const AgentResult(output: 'v1', tokensUsed: 100),
           const AgentResult(output: 'v2', tokensUsed: 150),
         ],
       );
-      final reviewer = _FakeAgent(
+      final reviewer = FakeAgent(
         name: 'reviewer',
         results: [
           const AgentResult(output: 'no', tokensUsed: 30),
@@ -681,14 +635,14 @@ void main() {
     });
 
     test('lastProducerResult is from the final iteration', () async {
-      final producer = _FakeAgent(
+      final producer = FakeAgent(
         name: 'producer',
         results: [
           const AgentResult(output: 'first attempt'),
           const AgentResult(output: 'second attempt'),
         ],
       );
-      final reviewer = _FakeAgent(
+      final reviewer = FakeAgent(
         name: 'reviewer',
         results: [
           const AgentResult(output: 'reject'),
@@ -709,14 +663,14 @@ void main() {
     });
 
     test('lastReviewerResult is from the final iteration', () async {
-      final producer = _FakeAgent(
+      final producer = FakeAgent(
         name: 'producer',
         results: [
           const AgentResult(output: 'v1'),
           const AgentResult(output: 'v2'),
         ],
       );
-      final reviewer = _FakeAgent(
+      final reviewer = FakeAgent(
         name: 'reviewer',
         results: [
           const AgentResult(output: 'reject'),
@@ -752,11 +706,11 @@ void main() {
     tearDown(() => tempDir.deleteSync(recursive: true));
 
     test('stops after maxIterations when never accepted', () async {
-      final producer = _FakeAgent.single(
+      final producer = FakeAgent.single(
         name: 'producer',
         result: const AgentResult(output: 'attempt'),
       );
-      final reviewer = _FakeAgent.single(
+      final reviewer = FakeAgent.single(
         name: 'reviewer',
         result: const AgentResult(output: 'rejected'),
       );
@@ -779,8 +733,8 @@ void main() {
     });
 
     test('maxIterations = 1 runs exactly one iteration', () async {
-      final producer = _FakeAgent.single(name: 'producer');
-      final reviewer = _FakeAgent.single(name: 'reviewer');
+      final producer = FakeAgent.single(name: 'producer');
+      final reviewer = FakeAgent.single(name: 'reviewer');
 
       final loop = AgentLoop(
         context: ctx,
@@ -799,8 +753,8 @@ void main() {
     });
 
     test('default maxIterations = 5 runs up to 5 iterations', () async {
-      final producer = _FakeAgent.single(name: 'producer');
-      final reviewer = _FakeAgent.single(name: 'reviewer');
+      final producer = FakeAgent.single(name: 'producer');
+      final reviewer = FakeAgent.single(name: 'reviewer');
 
       final loop = AgentLoop(
         context: ctx,
@@ -819,8 +773,8 @@ void main() {
     });
 
     test('accepted on last iteration still sets accepted = true', () async {
-      final producer = _FakeAgent.single(name: 'producer');
-      final reviewer = _FakeAgent.single(name: 'reviewer');
+      final producer = FakeAgent.single(name: 'producer');
+      final reviewer = FakeAgent.single(name: 'reviewer');
 
       final loop = AgentLoop(
         context: ctx,
@@ -855,8 +809,8 @@ void main() {
     test('receives the reviewerResult from current iteration', () async {
       final capturedResults = <AgentResult>[];
 
-      final producer = _FakeAgent.single(name: 'producer');
-      final reviewer = _FakeAgent(
+      final producer = FakeAgent.single(name: 'producer');
+      final reviewer = FakeAgent(
         name: 'reviewer',
         results: [
           const AgentResult(output: 'feedback-0'),
@@ -885,8 +839,8 @@ void main() {
     test('receives the correct iteration index', () async {
       final capturedIterations = <int>[];
 
-      final producer = _FakeAgent.single(name: 'producer');
-      final reviewer = _FakeAgent.single(name: 'reviewer');
+      final producer = FakeAgent.single(name: 'producer');
+      final reviewer = FakeAgent.single(name: 'reviewer');
 
       final loop = AgentLoop(
         context: ctx,
@@ -905,8 +859,8 @@ void main() {
     });
 
     test('can inspect reviewer output to decide acceptance', () async {
-      final producer = _FakeAgent.single(name: 'producer');
-      final reviewer = _FakeAgent(
+      final producer = FakeAgent.single(name: 'producer');
+      final reviewer = FakeAgent(
         name: 'reviewer',
         results: [
           const AgentResult(output: 'REJECTED'),
@@ -945,8 +899,8 @@ void main() {
     tearDown(() => tempDir.deleteSync(recursive: true));
 
     test('uses custom prompt builder for producer on iteration 0', () async {
-      final producer = _FakeAgent.single(name: 'producer');
-      final reviewer = _FakeAgent.single(name: 'reviewer');
+      final producer = FakeAgent.single(name: 'producer');
+      final reviewer = FakeAgent.single(name: 'reviewer');
 
       final loop = AgentLoop(
         context: ctx,
@@ -971,14 +925,14 @@ void main() {
       () async {
         AgentResult? capturedPreviousResult;
 
-        final producer = _FakeAgent(
+        final producer = FakeAgent(
           name: 'producer',
           results: [
             const AgentResult(output: 'v1'),
             const AgentResult(output: 'v2'),
           ],
         );
-        final reviewer = _FakeAgent(
+        final reviewer = FakeAgent(
           name: 'reviewer',
           results: [
             const AgentResult(output: 'fix the bug'),
@@ -1013,8 +967,8 @@ void main() {
           output: 'sentinel',
         );
 
-        final producer = _FakeAgent.single(name: 'producer');
-        final reviewer = _FakeAgent.single(name: 'reviewer');
+        final producer = FakeAgent.single(name: 'producer');
+        final reviewer = FakeAgent.single(name: 'reviewer');
 
         final loop = AgentLoop(
           context: ctx,
@@ -1036,8 +990,8 @@ void main() {
     test('custom prompt builder receives the original task', () async {
       String? capturedTask;
 
-      final producer = _FakeAgent.single(name: 'producer');
-      final reviewer = _FakeAgent.single(name: 'reviewer');
+      final producer = FakeAgent.single(name: 'producer');
+      final reviewer = FakeAgent.single(name: 'reviewer');
 
       final loop = AgentLoop(
         context: ctx,
@@ -1058,8 +1012,8 @@ void main() {
     test('custom prompt builder receives the FileContext', () async {
       FileContext? capturedCtx;
 
-      final producer = _FakeAgent.single(name: 'producer');
-      final reviewer = _FakeAgent.single(name: 'reviewer');
+      final producer = FakeAgent.single(name: 'producer');
+      final reviewer = FakeAgent.single(name: 'reviewer');
 
       final loop = AgentLoop(
         context: ctx,
@@ -1093,11 +1047,11 @@ void main() {
     tearDown(() => tempDir.deleteSync(recursive: true));
 
     test('uses custom reviewer prompt builder', () async {
-      final producer = _FakeAgent.single(
+      final producer = FakeAgent.single(
         name: 'producer',
         result: const AgentResult(output: 'my code'),
       );
-      final reviewer = _FakeAgent.single(name: 'reviewer');
+      final reviewer = FakeAgent.single(name: 'reviewer');
 
       final loop = AgentLoop(
         context: ctx,
@@ -1122,11 +1076,11 @@ void main() {
       () async {
         AgentResult? capturedProducerResult;
 
-        final producer = _FakeAgent.single(
+        final producer = FakeAgent.single(
           name: 'producer',
           result: const AgentResult(output: 'produced output', tokensUsed: 42),
         );
-        final reviewer = _FakeAgent.single(name: 'reviewer');
+        final reviewer = FakeAgent.single(name: 'reviewer');
 
         final loop = AgentLoop(
           context: ctx,
@@ -1150,14 +1104,14 @@ void main() {
     test('custom reviewer prompt receives correct iteration index', () async {
       final capturedIterations = <int>[];
 
-      final producer = _FakeAgent(
+      final producer = FakeAgent(
         name: 'producer',
         results: [
           const AgentResult(output: 'v1'),
           const AgentResult(output: 'v2'),
         ],
       );
-      final reviewer = _FakeAgent(
+      final reviewer = FakeAgent(
         name: 'reviewer',
         results: [
           const AgentResult(output: 'no'),
@@ -1184,8 +1138,8 @@ void main() {
     test('custom reviewer prompt receives the FileContext', () async {
       FileContext? capturedCtx;
 
-      final producer = _FakeAgent.single(name: 'producer');
-      final reviewer = _FakeAgent.single(name: 'reviewer');
+      final producer = FakeAgent.single(name: 'producer');
+      final reviewer = FakeAgent.single(name: 'reviewer');
 
       final loop = AgentLoop(
         context: ctx,
@@ -1220,8 +1174,8 @@ void main() {
 
     test('producer exception propagates immediately', () async {
       final error = Exception('producer crash');
-      final producer = _FakeAgent.throwing(name: 'producer', error: error);
-      final reviewer = _FakeAgent.single(name: 'reviewer');
+      final producer = FakeAgent.throwing(name: 'producer', error: error);
+      final reviewer = FakeAgent.single(name: 'reviewer');
 
       final loop = AgentLoop(
         context: ctx,
@@ -1237,8 +1191,8 @@ void main() {
 
     test('reviewer exception propagates immediately', () async {
       final error = Exception('reviewer crash');
-      final producer = _FakeAgent.single(name: 'producer');
-      final reviewer = _FakeAgent.throwing(name: 'reviewer', error: error);
+      final producer = FakeAgent.single(name: 'producer');
+      final reviewer = FakeAgent.throwing(name: 'reviewer', error: error);
 
       final loop = AgentLoop(
         context: ctx,
@@ -1266,7 +1220,7 @@ void main() {
           },
         );
 
-        final reviewer = _FakeAgent.single(
+        final reviewer = FakeAgent.single(
           name: 'reviewer',
           result: const AgentResult(output: 'needs work'),
         );
@@ -1302,8 +1256,8 @@ void main() {
     tearDown(() => tempDir.deleteSync(recursive: true));
 
     test('duration is non-negative', () async {
-      final producer = _FakeAgent.single(name: 'producer');
-      final reviewer = _FakeAgent.single(name: 'reviewer');
+      final producer = FakeAgent.single(name: 'producer');
+      final reviewer = FakeAgent.single(name: 'reviewer');
 
       final loop = AgentLoop(
         context: ctx,
@@ -1318,8 +1272,8 @@ void main() {
     });
 
     test('duration does not exceed wall-clock time', () async {
-      final producer = _FakeAgent.single(name: 'producer');
-      final reviewer = _FakeAgent.single(name: 'reviewer');
+      final producer = FakeAgent.single(name: 'producer');
+      final reviewer = FakeAgent.single(name: 'reviewer');
 
       final loop = AgentLoop(
         context: ctx,
@@ -1357,8 +1311,8 @@ void main() {
     test(
       'default producer prompt on iteration 0 is the original task',
       () async {
-        final producer = _FakeAgent.single(name: 'producer');
-        final reviewer = _FakeAgent.single(name: 'reviewer');
+        final producer = FakeAgent.single(name: 'producer');
+        final reviewer = FakeAgent.single(name: 'reviewer');
 
         final loop = AgentLoop(
           context: ctx,
@@ -1376,14 +1330,14 @@ void main() {
     test(
       'default producer prompt on iteration 1+ appends feedback section',
       () async {
-        final producer = _FakeAgent(
+        final producer = FakeAgent(
           name: 'producer',
           results: [
             const AgentResult(output: 'v1'),
             const AgentResult(output: 'v2'),
           ],
         );
-        final reviewer = _FakeAgent(
+        final reviewer = FakeAgent(
           name: 'reviewer',
           results: [
             const AgentResult(output: 'Fix bug in line 42'),
@@ -1415,11 +1369,11 @@ void main() {
     );
 
     test('default reviewer prompt format contains required elements', () async {
-      final producer = _FakeAgent.single(
+      final producer = FakeAgent.single(
         name: 'producer',
         result: const AgentResult(output: 'producer output here'),
       );
-      final reviewer = _FakeAgent.single(name: 'reviewer');
+      final reviewer = FakeAgent.single(name: 'reviewer');
 
       final loop = AgentLoop(
         context: ctx,
@@ -1455,8 +1409,8 @@ void main() {
     tearDown(() => tempDir.deleteSync(recursive: true));
 
     test('custom producer and reviewer prompts are both used', () async {
-      final producer = _FakeAgent.single(name: 'producer');
-      final reviewer = _FakeAgent.single(name: 'reviewer');
+      final producer = FakeAgent.single(name: 'producer');
+      final reviewer = FakeAgent.single(name: 'reviewer');
 
       final loop = AgentLoop(
         context: ctx,
@@ -1489,8 +1443,8 @@ void main() {
     tearDown(() => tempDir.deleteSync(recursive: true));
 
     test('empty task string is passed through to producer', () async {
-      final producer = _FakeAgent.single(name: 'producer');
-      final reviewer = _FakeAgent.single(name: 'reviewer');
+      final producer = FakeAgent.single(name: 'producer');
+      final reviewer = FakeAgent.single(name: 'reviewer');
 
       final loop = AgentLoop(
         context: ctx,
@@ -1505,8 +1459,8 @@ void main() {
     });
 
     test('large maxIterations only runs as many as needed', () async {
-      final producer = _FakeAgent.single(name: 'producer');
-      final reviewer = _FakeAgent.single(name: 'reviewer');
+      final producer = FakeAgent.single(name: 'producer');
+      final reviewer = FakeAgent.single(name: 'reviewer');
 
       final loop = AgentLoop(
         context: ctx,
@@ -1525,7 +1479,7 @@ void main() {
     });
 
     test('producer and reviewer can be the same agent instance', () async {
-      final agent = _FakeAgent.single(
+      final agent = FakeAgent.single(
         name: 'dual',
         result: const AgentResult(output: 'output', tokensUsed: 10),
       );
@@ -1546,11 +1500,11 @@ void main() {
     test(
       'iteration with zero tokensUsed agents results in totalTokensUsed = 0',
       () async {
-        final producer = _FakeAgent.single(
+        final producer = FakeAgent.single(
           name: 'producer',
           result: const AgentResult(output: 'out', tokensUsed: 0),
         );
-        final reviewer = _FakeAgent.single(
+        final reviewer = FakeAgent.single(
           name: 'reviewer',
           result: const AgentResult(output: 'review', tokensUsed: 0),
         );
@@ -1574,7 +1528,7 @@ void main() {
         // Verify the correlation between the reviewer result and isAccepted
         final reviewerOutputs = <String>[];
 
-        final producer = _FakeAgent(
+        final producer = FakeAgent(
           name: 'producer',
           results: [
             const AgentResult(output: 'p0'),
@@ -1582,7 +1536,7 @@ void main() {
             const AgentResult(output: 'p2'),
           ],
         );
-        final reviewer = _FakeAgent(
+        final reviewer = FakeAgent(
           name: 'reviewer',
           results: [
             const AgentResult(output: 'review-0'),
@@ -1701,55 +1655,54 @@ void main() {
 
     tearDown(() => tempDir.deleteSync(recursive: true));
 
-    test(
-      'producer returns same output repeatedly → '
-      'stoppedReason="loop_detected" and accepted=false',
-      () async {
-        // Producer always returns the same output; with default threshold
-        // of 3, the loop should stop after 3 identical producer outputs.
-        final producer = _FakeAgent.single(
-          name: 'producer',
-          result: const AgentResult(output: 'same output every time'),
-        );
-        final reviewer = _FakeAgent.single(
-          name: 'reviewer',
-          result: const AgentResult(output: 'needs work'),
-        );
+    test('producer returns same output repeatedly → '
+        'stoppedReason="loop_detected" and accepted=false', () async {
+      // Producer always returns the same output; with default threshold
+      // of 3, the loop should stop after 3 identical producer outputs.
+      final producer = FakeAgent.single(
+        name: 'producer',
+        result: const AgentResult(output: 'same output every time'),
+      );
+      final reviewer = FakeAgent.single(
+        name: 'reviewer',
+        result: const AgentResult(output: 'needs work'),
+      );
 
-        final loop = AgentLoop(
-          context: ctx,
-          producer: producer,
-          reviewer: reviewer,
-          isAccepted: (result, iteration) => false, // never accept
-          maxIterations: 10,
-          loopDetectionConfig: const LoopDetectionConfig(
-            maxConsecutiveIdenticalOutputs: 3,
-          ),
-        );
+      final loop = AgentLoop(
+        context: ctx,
+        producer: producer,
+        reviewer: reviewer,
+        isAccepted: (result, iteration) => false, // never accept
+        maxIterations: 10,
+        loopDetectionConfig: const LoopDetectionConfig(
+          maxConsecutiveIdenticalOutputs: 3,
+        ),
+      );
 
-        final result = await loop.run('task');
+      final result = await loop.run('task');
 
-        expect(result.stoppedReason, equals('loop_detected'));
-        expect(result.accepted, isFalse);
-        expect(result.loopDetected, isTrue);
-        expect(result.iterationCount, 3);
-        expect(producer.callCount, 3);
-        expect(reviewer.callCount, 3);
-      },
-    );
+      expect(result.stoppedReason, equals(AgentStopReason.loopDetected));
+      expect(result.accepted, isFalse);
+      expect(result.loopDetected, isTrue);
+      expect(result.iterationCount, 3);
+      expect(producer.callCount, 3);
+      expect(reviewer.callCount, 3);
+    });
 
     test('different outputs → normal completion (accepted)', () async {
       // Outputs must differ significantly (bigram similarity < 0.85) to
       // avoid triggering the near-identical output detector.
-      final producer = _FakeAgent(
+      final producer = FakeAgent(
         name: 'producer',
         results: [
           const AgentResult(output: 'Implementing the database schema now'),
           const AgentResult(output: 'Refactoring the HTTP handler layer'),
-          const AgentResult(output: 'All unit tests pass and coverage is green'),
+          const AgentResult(
+            output: 'All unit tests pass and coverage is green',
+          ),
         ],
       );
-      final reviewer = _FakeAgent(
+      final reviewer = FakeAgent(
         name: 'reviewer',
         results: [
           const AgentResult(output: 'needs work'),
@@ -1771,41 +1724,43 @@ void main() {
 
       final result = await loop.run('task');
 
-      expect(result.stoppedReason, equals('accepted'));
+      expect(result.stoppedReason, equals(AgentStopReason.accepted));
       expect(result.accepted, isTrue);
       expect(result.loopDetected, isFalse);
     });
 
-    test('no config → runs to maxIterations despite identical outputs',
-        () async {
-      // Same output from producer every time, but no loop detection
-      // configured — should exhaust maxIterations.
-      final producer = _FakeAgent.single(
-        name: 'producer',
-        result: const AgentResult(output: 'same output'),
-      );
-      final reviewer = _FakeAgent.single(
-        name: 'reviewer',
-        result: const AgentResult(output: 'rejected'),
-      );
+    test(
+      'no config → runs to maxIterations despite identical outputs',
+      () async {
+        // Same output from producer every time, but no loop detection
+        // configured — should exhaust maxIterations.
+        final producer = FakeAgent.single(
+          name: 'producer',
+          result: const AgentResult(output: 'same output'),
+        );
+        final reviewer = FakeAgent.single(
+          name: 'reviewer',
+          result: const AgentResult(output: 'rejected'),
+        );
 
-      final loop = AgentLoop(
-        context: ctx,
-        producer: producer,
-        reviewer: reviewer,
-        isAccepted: (result, iteration) => false,
-        maxIterations: 3,
-        loopDetectionConfig: null,
-      );
+        final loop = AgentLoop(
+          context: ctx,
+          producer: producer,
+          reviewer: reviewer,
+          isAccepted: (result, iteration) => false,
+          maxIterations: 3,
+          loopDetectionConfig: null,
+        );
 
-      final result = await loop.run('task');
+        final result = await loop.run('task');
 
-      expect(result.stoppedReason, equals('max_iterations'));
-      expect(result.accepted, isFalse);
-      expect(result.iterationCount, 3);
-      expect(result.loopDetected, isFalse);
-      expect(result.reachedMaxIterations, isTrue);
-    });
+        expect(result.stoppedReason, equals(AgentStopReason.maxIterations));
+        expect(result.accepted, isFalse);
+        expect(result.iterationCount, 3);
+        expect(result.loopDetected, isFalse);
+        expect(result.reachedMaxIterations, isTrue);
+      },
+    );
   });
 }
 
@@ -1820,7 +1775,7 @@ class _CustomAgent extends Agent {
     required Future<AgentResult> Function(String, FileContext?) handler,
   }) : _handler = handler,
        super(
-         client: LmStudioClient(AgentsCoreConfig(logger: const SilentLogger())),
+         client: MockLlmClient(),
          config: AgentsCoreConfig(logger: const SilentLogger()),
        );
 

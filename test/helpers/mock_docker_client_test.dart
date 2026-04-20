@@ -10,8 +10,7 @@ void main() {
     String stdout = 'ok',
     String stderr = '',
     int exitCode = 0,
-  }) =>
-      DockerRunResult(stdout: stdout, stderr: stderr, exitCode: exitCode);
+  }) => DockerRunResult(stdout: stdout, stderr: stderr, exitCode: exitCode);
 
   Future<DockerRunResult> runMock(
     MockDockerClient docker, {
@@ -21,15 +20,14 @@ void main() {
     String? workingDir,
     Duration timeout = const Duration(seconds: 60),
     Map<String, String> environment = const {},
-  }) =>
-      docker.runContainer(
-        image: image,
-        command: command,
-        volumes: volumes,
-        workingDir: workingDir,
-        timeout: timeout,
-        environment: environment,
-      );
+  }) => docker.runContainer(
+    image: image,
+    command: command,
+    volumes: volumes,
+    workingDir: workingDir,
+    timeout: timeout,
+    environment: environment,
+  );
 
   // ── group: construction ───────────────────────────────────────────────────
 
@@ -83,16 +81,16 @@ void main() {
       expect(await docker.isImageAvailable('python:3.12-slim'), isFalse);
     });
 
-    test('overrides per-image via imageAvailability constructor param', () async {
-      final docker = MockDockerClient(
-        imageAvailability: {
-          'python:3.12-slim': false,
-          'ubuntu:22.04': true,
-        },
-      );
-      expect(await docker.isImageAvailable('python:3.12-slim'), isFalse);
-      expect(await docker.isImageAvailable('ubuntu:22.04'), isTrue);
-    });
+    test(
+      'overrides per-image via imageAvailability constructor param',
+      () async {
+        final docker = MockDockerClient(
+          imageAvailability: {'python:3.12-slim': false, 'ubuntu:22.04': true},
+        );
+        expect(await docker.isImageAvailable('python:3.12-slim'), isFalse);
+        expect(await docker.isImageAvailable('ubuntu:22.04'), isTrue);
+      },
+    );
 
     test('setImageAvailable() overrides per-image at runtime', () async {
       final docker = MockDockerClient();
@@ -121,20 +119,20 @@ void main() {
       expect(docker.pullImageCalls, ['python:3.12-slim', 'ubuntu:22.04']);
     });
 
-    test('throws DockerNotAvailableException when Docker unavailable', () async {
-      final docker = MockDockerClient(isDockerAvailable: false);
-      expect(
-        () => docker.pullImage('python:3.12-slim'),
-        throwsA(isA<DockerNotAvailableException>()),
-      );
-    });
+    test(
+      'throws DockerNotAvailableException when Docker unavailable',
+      () async {
+        final docker = MockDockerClient(isDockerAvailable: false);
+        expect(
+          () => docker.pullImage('python:3.12-slim'),
+          throwsA(isA<DockerNotAvailableException>()),
+        );
+      },
+    );
 
     test('succeeds silently when Docker is available', () async {
       final docker = MockDockerClient();
-      await expectLater(
-        docker.pullImage('python:3.12-slim'),
-        completes,
-      );
+      await expectLater(docker.pullImage('python:3.12-slim'), completes);
     });
   });
 
@@ -237,36 +235,35 @@ void main() {
       );
     });
 
-    test('enqueueNotAvailable() convenience queues DockerNotAvailableException',
-        () async {
-      final docker = MockDockerClient();
-      docker.enqueueNotAvailable(message: 'no docker here');
+    test(
+      'enqueueNotAvailable() convenience queues DockerNotAvailableException',
+      () async {
+        final docker = MockDockerClient();
+        docker.enqueueNotAvailable(message: 'no docker here');
 
-      expect(
-        () => runMock(docker),
-        throwsA(
-          isA<DockerNotAvailableException>()
-              .having((e) => e.message, 'message', 'no docker here'),
-        ),
-      );
-    });
+        expect(
+          () => runMock(docker),
+          throwsA(
+            isA<DockerNotAvailableException>().having(
+              (e) => e.message,
+              'message',
+              'no docker here',
+            ),
+          ),
+        );
+      },
+    );
 
     test('exceptions and results can be interleaved in the queue', () async {
       final docker = MockDockerClient();
       docker.enqueueResult(okResult(stdout: 'before'));
       docker.enqueueException(
-        const DockerExecutionException(
-          message: 'oops',
-          exitCode: 125,
-        ),
+        const DockerExecutionException(message: 'oops', exitCode: 125),
       );
       docker.enqueueResult(okResult(stdout: 'after'));
 
       expect((await runMock(docker)).stdout, 'before');
-      expect(
-        () => runMock(docker),
-        throwsA(isA<DockerExecutionException>()),
-      );
+      expect(() => runMock(docker), throwsA(isA<DockerExecutionException>()));
       expect((await runMock(docker)).stdout, 'after');
     });
   });
@@ -274,16 +271,18 @@ void main() {
   // ── group: Docker unavailable guard ──────────────────────────────────────
 
   group('runContainer() — Docker unavailable guard', () {
-    test('throws DockerNotAvailableException when isDockerAvailable is false',
-        () async {
-      final docker = MockDockerClient(isDockerAvailable: false);
-      docker.enqueueResult(okResult()); // queued result is ignored
+    test(
+      'throws DockerNotAvailableException when isDockerAvailable is false',
+      () async {
+        final docker = MockDockerClient(isDockerAvailable: false);
+        docker.enqueueResult(okResult()); // queued result is ignored
 
-      expect(
-        () => runMock(docker),
-        throwsA(isA<DockerNotAvailableException>()),
-      );
-    });
+        expect(
+          () => runMock(docker),
+          throwsA(isA<DockerNotAvailableException>()),
+        );
+      },
+    );
 
     test('still records the call even when Docker is unavailable', () async {
       final docker = MockDockerClient(isDockerAvailable: false);
@@ -298,15 +297,14 @@ void main() {
       expect(docker.runContainerCalls.first.image, 'python:3.12-slim');
     });
 
-    test('throws StateError when queue is empty and Docker is available',
-        () async {
-      final docker = MockDockerClient();
+    test(
+      'throws StateError when queue is empty and Docker is available',
+      () async {
+        final docker = MockDockerClient();
 
-      expect(
-        () => runMock(docker),
-        throwsA(isA<StateError>()),
-      );
-    });
+        expect(() => runMock(docker), throwsA(isA<StateError>()));
+      },
+    );
   });
 
   // ── group: call recording ─────────────────────────────────────────────────
@@ -331,12 +329,11 @@ void main() {
       final docker = MockDockerClient();
       docker.enqueueResult(okResult());
 
-      await runMock(
-        docker,
-        volumes: {'/tmp/host': '/container/path'},
-      );
+      await runMock(docker, volumes: {'/tmp/host': '/container/path'});
 
-      expect(docker.runContainerCalls.first.volumes, {'/tmp/host': '/container/path'});
+      expect(docker.runContainerCalls.first.volumes, {
+        '/tmp/host': '/container/path',
+      });
     });
 
     test('records workingDir', () async {
@@ -375,10 +372,10 @@ void main() {
 
       await runMock(docker, environment: {'MY_VAR': 'hello', 'OTHER': 'world'});
 
-      expect(
-        docker.runContainerCalls.first.environment,
-        {'MY_VAR': 'hello', 'OTHER': 'world'},
-      );
+      expect(docker.runContainerCalls.first.environment, {
+        'MY_VAR': 'hello',
+        'OTHER': 'world',
+      });
     });
 
     test('accumulates multiple calls', () async {

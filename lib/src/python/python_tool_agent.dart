@@ -2,13 +2,13 @@ import 'dart:io';
 
 import '../agent/agent_result.dart';
 import '../agent/react_agent.dart';
-import '../client/lm_studio_client.dart';
+import '../client/llm_client.dart';
 import '../config/agents_core_config.dart';
 import '../context/file_context.dart';
 import '../docker/docker_client.dart';
 import '../exceptions/docker_exceptions.dart';
 import '../models/tool_definition.dart';
-import 'file_context_tools.dart';
+import '../context/file_context_tools.dart';
 import 'python_execution_tool.dart';
 
 /// An agent that can execute Python code in a sandboxed Docker container.
@@ -64,7 +64,7 @@ class PythonToolAgent extends ReActAgent {
   /// 10) to accommodate multi-step Python workflows.
   factory PythonToolAgent({
     required String name,
-    required LmStudioClient client,
+    required LlmClient client,
     required AgentsCoreConfig config,
     required DockerClient dockerClient,
     FileContext? fileContext,
@@ -79,7 +79,8 @@ class PythonToolAgent extends ReActAgent {
     String? systemPrompt,
   }) {
     // Resolve or create the workspace.
-    final context = fileContext ??
+    final context =
+        fileContext ??
         FileContext(
           workspacePath:
               '$_systemTempPath/agents_core_${DateTime.now().millisecondsSinceEpoch}',
@@ -172,7 +173,8 @@ class PythonToolAgent extends ReActAgent {
     final available = await dockerClient.isAvailable();
     if (!available) {
       throw DockerNotAvailableException(
-        message: 'Docker is not available. '
+        message:
+            'Docker is not available. '
             'Please ensure Docker is installed and the daemon is running. '
             'On macOS/Windows, open Docker Desktop. '
             'On Linux, run: sudo systemctl start docker',
@@ -201,48 +203,67 @@ class PythonToolAgent extends ReActAgent {
   /// Builds the default system prompt based on enabled features.
   static String _buildDefaultSystemPrompt(bool enableFileTools) {
     final buffer = StringBuffer()
-      ..writeln('You are a helpful AI assistant with Python code execution '
-          'capabilities.')
+      ..writeln(
+        'You are a helpful AI assistant with Python code execution '
+        'capabilities.',
+      )
       ..writeln()
-      ..writeln('You have access to a sandboxed Python environment running '
-          'in a Docker container. The working directory is /workspace.')
+      ..writeln(
+        'You have access to a sandboxed Python environment running '
+        'in a Docker container. The working directory is /workspace.',
+      )
       ..writeln()
       ..writeln('## execute_python tool')
-      ..writeln('- Use this tool to run Python code for computations, data '
-          'analysis, file processing, or any task that benefits from code '
-          'execution.')
-      ..writeln('- You can install pip packages by providing a '
-          '"requirements" list.')
+      ..writeln(
+        '- Use this tool to run Python code for computations, data '
+        'analysis, file processing, or any task that benefits from code '
+        'execution.',
+      )
+      ..writeln(
+        '- You can install pip packages by providing a '
+        '"requirements" list.',
+      )
       ..writeln('- The container has no network access for security.')
-      ..writeln('- The /workspace directory is shared between executions, '
-          'so files written by one execution are available to the next.');
+      ..writeln(
+        '- The /workspace directory is shared between executions, '
+        'so files written by one execution are available to the next.',
+      );
 
     if (enableFileTools) {
       buffer
         ..writeln()
         ..writeln('## File tools')
-        ..writeln('- Use read_file, write_file, and list_files to interact '
-            'with the /workspace directory directly.')
-        ..writeln('- These tools operate on the same workspace as '
-            'execute_python, so you can prepare input files before '
-            'execution and inspect output files after.');
+        ..writeln(
+          '- Use read_file, write_file, and list_files to interact '
+          'with the /workspace directory directly.',
+        )
+        ..writeln(
+          '- These tools operate on the same workspace as '
+          'execute_python, so you can prepare input files before '
+          'execution and inspect output files after.',
+        );
     }
 
     buffer
       ..writeln()
       ..writeln('## Guidelines')
       ..writeln('- Break complex tasks into smaller steps.')
-      ..writeln('- When code fails, read the error message carefully and '
-          'fix the issue.')
-      ..writeln('- Prefer using print() to show results rather than '
-          'returning values.')
-      ..writeln('- Always explain your reasoning before and after running '
-          'code.');
+      ..writeln(
+        '- When code fails, read the error message carefully and '
+        'fix the issue.',
+      )
+      ..writeln(
+        '- Prefer using print() to show results rather than '
+        'returning values.',
+      )
+      ..writeln(
+        '- Always explain your reasoning before and after running '
+        'code.',
+      );
 
     return buffer.toString().trimRight();
   }
 
   /// The system temporary directory path, obtained once.
-  static final String _systemTempPath =
-      Directory.systemTemp.path;
+  static final String _systemTempPath = Directory.systemTemp.path;
 }

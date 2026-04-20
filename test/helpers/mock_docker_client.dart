@@ -145,11 +145,11 @@ class MockDockerClient extends DockerClient {
     this.isDockerAvailable = true,
     Map<String, bool> imageAvailability = const {},
     bool defaultImageAvailable = true,
-  })  : _imageAvailability = Map<String, bool>.from(imageAvailability),
-        _defaultImageAvailable = defaultImageAvailable,
-        // Pass a fake dockerPath so the real constructor won't accidentally
-        // resolve to a real docker binary.
-        super(dockerPath: 'mock-docker');
+  }) : _imageAvailability = Map<String, bool>.from(imageAvailability),
+       _defaultImageAvailable = defaultImageAvailable,
+       // Pass a fake dockerPath so the real constructor won't accidentally
+       // resolve to a real docker binary.
+       super(dockerPath: 'mock-docker');
 
   // ── Configuration ────────────────────────────────────────────────────────
 
@@ -208,10 +208,9 @@ class MockDockerClient extends DockerClient {
     String stdout = '',
     String stderr = '',
     int exitCode = 0,
-  }) =>
-      enqueueResult(
-        DockerRunResult(stdout: stdout, stderr: stderr, exitCode: exitCode),
-      );
+  }) => enqueueResult(
+    DockerRunResult(stdout: stdout, stderr: stderr, exitCode: exitCode),
+  );
 
   /// How many responses are still waiting in the queue.
   int get pendingResponseCount => _runQueue.length;

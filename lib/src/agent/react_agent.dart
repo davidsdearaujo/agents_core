@@ -8,6 +8,7 @@ import '../models/chat_message.dart';
 import '../models/tool_call.dart';
 import 'agent.dart';
 import 'agent_result.dart';
+import 'agent_stop_reason.dart';
 
 /// A tool-handler function that receives parsed JSON arguments and returns
 /// a string result to feed back to the model.
@@ -34,13 +35,14 @@ typedef ToolHandler = Future<String> Function(Map<String, dynamic> arguments);
 ///
 /// The loop terminates when:
 /// - The model produces a response with **no tool calls** (natural
-///   completion, `stoppedReason: "completed"`).
-/// - [maxIterations] is reached (`stoppedReason: "max_iterations"`).
+///   completion, [AgentStopReason.completed]).
+/// - [maxIterations] is reached ([AgentStopReason.maxIterations]).
 /// - Cumulative token usage exceeds [maxTotalTokens]
-///   (`stoppedReason: "max_total_tokens"`).
-/// - A terminal tool is called ([terminalTools]) — `stoppedReason: "terminal_tool"`.
+///   ([AgentStopReason.maxTotalTokens]).
+/// - A terminal tool is called ([terminalTools]) —
+///   [AgentStopReason.terminalTool].
 /// - A repetitive loop is detected via [loopDetectionConfig]
-///   (`stoppedReason: "loop_detected"`).
+///   ([AgentStopReason.loopDetected]).
 ///
 /// Unregistered tools do **not** throw — instead an error string is returned
 /// to the LLM so it can self-correct.
@@ -60,7 +62,7 @@ typedef ToolHandler = Future<String> Function(Map<String, dynamic> arguments);
 ///
 /// final result = await agent.run('What is the weather in NYC?');
 /// print(result.output);
-/// print(result.stoppedReason); // "completed"
+/// print(result.stoppedReason); // AgentStopReason.completed
 /// ```
 class ReActAgent extends Agent {
   /// Creates a [ReActAgent].
@@ -116,7 +118,7 @@ class ReActAgent extends Agent {
   /// When non-null, a [LoopDetector] is created at the start of each
   /// [run] invocation and checks for repetitive tool-call sequences or
   /// near-identical outputs after each iteration. If a loop is detected,
-  /// the agent stops with `stoppedReason: "loop_detected"`.
+  /// the agent stops with [AgentStopReason.loopDetected].
   ///
   /// When `null` (the default), no loop detection is performed.
   final LoopDetectionConfig? loopDetectionConfig;
@@ -146,8 +148,10 @@ class ReActAgent extends Agent {
   /// ended.
   @override
   Future<AgentResult> run(String task, {FileContext? context}) async {
-    config.logger.info('[$name] Starting ReAct loop: '
-        '${task.length > 60 ? '${task.substring(0, 60)}...' : task}');
+    config.logger.info(
+      '[$name] Starting ReAct loop: '
+      '${task.length > 60 ? '${task.substring(0, 60)}...' : task}',
+    );
 
     final messages = <ChatMessage>[
       if (systemPrompt != null)
@@ -159,7 +163,7 @@ class ReActAgent extends Agent {
     var totalTokens = 0;
     var iterations = 0;
     ChatMessage? lastAssistantMessage;
-    String? stoppedReason;
+    AgentStopReason? stoppedReason;
 
     final detector = loopDetectionConfig != null
         ? LoopDetector(config: loopDetectionConfig!)
@@ -198,7 +202,7 @@ class ReActAgent extends Agent {
       // ── Step 2: Check for natural completion ──────────────────────────
       final toolCalls = assistantMessage.toolCalls;
       if (toolCalls == null || toolCalls.isEmpty) {
-        stoppedReason = 'completed';
+        stoppedReason = AgentStopReason.completed;
         config.logger.info(
           '[$name] Completed after $iterations iteration(s) '
           '($totalTokens tokens)',
@@ -222,11 +226,13 @@ class ReActAgent extends Agent {
         final result = await _executeTool(functionName, rawArguments);
 
         // Append tool result as a role:tool message.
-        messages.add(ChatMessage(
-          role: ChatMessageRole.tool,
-          content: result,
-          toolCallId: toolCallId,
-        ));
+        messages.add(
+          ChatMessage(
+            role: ChatMessageRole.tool,
+            content: result,
+            toolCallId: toolCallId,
+          ),
+        );
       }
 
       // ── Step 3.1: Check for terminal tool ──────────────────────────
@@ -235,7 +241,7 @@ class ReActAgent extends Agent {
           (tc) => terminalTools.contains(tc.function?.name),
         );
         if (calledTerminal) {
-          stoppedReason = 'terminal_tool';
+          stoppedReason = AgentStopReason.terminalTool;
           config.logger.info(
             '[$name] Terminal tool called — stopping after $iterations iteration(s) '
             '($totalTokens tokens)',
@@ -250,17 +256,15 @@ class ReActAgent extends Agent {
         detector.recordOutput(assistantMessage.content);
         final loopCheck = detector.check();
         if (loopCheck.isLooping) {
-          stoppedReason = 'loop_detected';
-          config.logger.warn(
-            '[$name] Loop detected: ${loopCheck.reason}',
-          );
+          stoppedReason = AgentStopReason.loopDetected;
+          config.logger.warn('[$name] Loop detected: ${loopCheck.reason}');
           break;
         }
       }
 
       // ── Step 4: Check token budget ────────────────────────────────────
       if (maxTotalTokens != null && totalTokens >= maxTotalTokens!) {
-        stoppedReason = 'max_total_tokens';
+        stoppedReason = AgentStopReason.maxTotalTokens;
         config.logger.warn(
           '[$name] Token budget exceeded: '
           '$totalTokens >= $maxTotalTokens',
@@ -271,10 +275,8 @@ class ReActAgent extends Agent {
 
     // If we exited the while loop without breaking, maxIterations was hit.
     if (stoppedReason == null) {
-      stoppedReason = 'max_iterations';
-      config.logger.warn(
-        '[$name] Max iterations reached: $maxIterations',
-      );
+      stoppedReason = AgentStopReason.maxIterations;
+      config.logger.warn('[$name] Max iterations reached: $maxIterations');
     }
 
     return AgentResult(
@@ -295,9 +297,7 @@ class ReActAgent extends Agent {
   Future<String> _executeTool(String functionName, String rawArguments) async {
     final handler = toolHandlers[functionName];
     if (handler == null) {
-      config.logger.warn(
-        '[$name] Unregistered tool called: $functionName',
-      );
+      config.logger.warn('[$name] Unregistered tool called: $functionName');
       return 'Error: tool "$functionName" is not registered. '
           'Available tools: ${toolHandlers.keys.join(", ")}';
     }
@@ -313,9 +313,7 @@ class ReActAgent extends Agent {
       );
       return 'Error: failed to parse arguments for "$functionName": $e';
     } on Exception catch (e) {
-      config.logger.error(
-        '[$name] Tool "$functionName" threw: $e',
-      );
+      config.logger.error('[$name] Tool "$functionName" threw: $e');
       return 'Error: tool "$functionName" failed: $e';
     }
   }

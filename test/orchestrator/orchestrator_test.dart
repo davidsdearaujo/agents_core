@@ -1,48 +1,9 @@
-// ignore_for_file: avoid_implementing_value_types
-
 import 'dart:io';
 
 import 'package:agents_core/agents_core.dart';
 import 'package:test/test.dart';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/// A fake [Agent] that never makes real HTTP calls.
-///
-/// Records the task and context it was called with, and either returns
-/// [_result] or throws [_throwError], depending on configuration.
-class _FakeAgent extends Agent {
-  _FakeAgent({
-    super.name = 'fake',
-    AgentResult? result,
-    Object? throwError,
-  })  : _result = result ?? const AgentResult(output: 'fake output'),
-        _throwError = throwError,
-        super(
-          client: LmStudioClient(
-            AgentsCoreConfig(logger: const SilentLogger()),
-          ),
-          config: AgentsCoreConfig(logger: const SilentLogger()),
-        );
-
-  final AgentResult _result;
-  final Object? _throwError;
-
-  String? capturedTask;
-  FileContext? capturedContext;
-  int callCount = 0;
-
-  @override
-  Future<AgentResult> run(String task, {FileContext? context}) async {
-    callCount++;
-    capturedTask = task;
-    capturedContext = context;
-    if (_throwError != null) throw _throwError;
-    return _result;
-  }
-}
+import '../helpers/fake_agents.dart';
 
 /// Creates a [FileContext] backed by a temp directory.
 ({FileContext ctx, Directory dir}) _tempContext() {
@@ -60,49 +21,41 @@ void main() {
 
   group('AgentStep', () {
     test('stores agent reference', () {
-      final agent = _FakeAgent(name: 'writer');
+      final agent = FakeAgent(name: 'writer');
       final step = AgentStep(agent: agent, taskPrompt: 'do work');
       expect(step.agent, same(agent));
     });
 
-    test('stores static String taskPrompt', () {
-      final step = AgentStep(
-        agent: _FakeAgent(),
-        taskPrompt: 'write a report',
-      );
-      expect(step.taskPrompt, isA<String>());
-      expect(step.taskPrompt, 'write a report');
+    test('wraps static String taskPrompt in StaticPrompt', () {
+      final step = AgentStep(agent: FakeAgent(), taskPrompt: 'write a report');
+      expect(step.taskPrompt, isA<StaticPrompt>());
+      expect((step.taskPrompt as StaticPrompt).value, 'write a report');
     });
 
     test('condition is null by default', () {
-      final step = AgentStep(agent: _FakeAgent(), taskPrompt: 'task');
+      final step = AgentStep(agent: FakeAgent(), taskPrompt: 'task');
       expect(step.condition, isNull);
     });
 
     test('stores provided condition', () {
       Future<bool> cond(FileContext ctx) async => true;
       final step = AgentStep(
-        agent: _FakeAgent(),
+        agent: FakeAgent(),
         taskPrompt: 'task',
         condition: cond,
       );
       expect(step.condition, same(cond));
     });
 
-    test('AgentStep.dynamic stores function taskPrompt', () {
+    test('AgentStep.dynamic wraps function taskPrompt in DynamicPrompt', () {
       Future<String> promptFn(FileContext ctx) async => 'dynamic task';
-      final step = AgentStep.dynamic(
-        agent: _FakeAgent(),
-        taskPrompt: promptFn,
-      );
-      expect(
-        step.taskPrompt,
-        isA<Future<String> Function(FileContext)>(),
-      );
+      final step = AgentStep.dynamic(agent: FakeAgent(), taskPrompt: promptFn);
+      expect(step.taskPrompt, isA<DynamicPrompt>());
+      expect((step.taskPrompt as DynamicPrompt).resolver, same(promptFn));
     });
 
     test('AgentStep.dynamic stores agent reference', () {
-      final agent = _FakeAgent(name: 'dyn-agent');
+      final agent = FakeAgent(name: 'dyn-agent');
       final step = AgentStep.dynamic(
         agent: agent,
         taskPrompt: (ctx) async => 'task',
@@ -112,7 +65,7 @@ void main() {
 
     test('AgentStep.dynamic condition is null by default', () {
       final step = AgentStep.dynamic(
-        agent: _FakeAgent(),
+        agent: FakeAgent(),
         taskPrompt: (ctx) async => 'task',
       );
       expect(step.condition, isNull);
@@ -121,7 +74,7 @@ void main() {
     test('AgentStep.dynamic stores provided condition', () {
       Future<bool> cond(FileContext ctx) async => false;
       final step = AgentStep.dynamic(
-        agent: _FakeAgent(),
+        agent: FakeAgent(),
         taskPrompt: (ctx) async => 'task',
         condition: cond,
       );
@@ -151,11 +104,8 @@ void main() {
     });
 
     test('accepts context and non-empty steps list', () {
-      final step = AgentStep(agent: _FakeAgent(), taskPrompt: 'task');
-      expect(
-        () => Orchestrator(context: ctx, steps: [step]),
-        returnsNormally,
-      );
+      final step = AgentStep(agent: FakeAgent(), taskPrompt: 'task');
+      expect(() => Orchestrator(context: ctx, steps: [step]), returnsNormally);
     });
 
     test('exposes context', () {
@@ -164,7 +114,7 @@ void main() {
     });
 
     test('exposes steps list', () {
-      final step = AgentStep(agent: _FakeAgent(), taskPrompt: 'task');
+      final step = AgentStep(agent: FakeAgent(), taskPrompt: 'task');
       final orch = Orchestrator(context: ctx, steps: [step]);
       expect(orch.steps, hasLength(1));
       expect(orch.steps.first, same(step));
@@ -191,7 +141,7 @@ void main() {
     });
 
     test('calls agent.run() with the static taskPrompt', () async {
-      final agent = _FakeAgent();
+      final agent = FakeAgent();
       final orch = Orchestrator(
         context: ctx,
         steps: [AgentStep(agent: agent, taskPrompt: 'hello task')],
@@ -201,7 +151,7 @@ void main() {
     });
 
     test('passes orchestrator FileContext to agent.run()', () async {
-      final agent = _FakeAgent();
+      final agent = FakeAgent();
       final orch = Orchestrator(
         context: ctx,
         steps: [AgentStep(agent: agent, taskPrompt: 'task')],
@@ -212,14 +162,11 @@ void main() {
 
     test('executes multiple steps sequentially', () async {
       final order = <String>[];
-      final agent1 = _FakeAgent(
+      final agent1 = FakeAgent.single(
         name: 'a1',
-        result: AgentResult(
-          output: 'result1',
-          filesModified: const [],
-        ),
+        result: AgentResult(output: 'result1', filesModified: const []),
       );
-      final agent2 = _FakeAgent(
+      final agent2 = FakeAgent.single(
         name: 'a2',
         result: const AgentResult(output: 'result2'),
       );
@@ -254,7 +201,7 @@ void main() {
     });
 
     test('agent.run() is called exactly once per step', () async {
-      final agent = _FakeAgent();
+      final agent = FakeAgent();
       final orch = Orchestrator(
         context: ctx,
         steps: [AgentStep(agent: agent, taskPrompt: 'task')],
@@ -278,29 +225,31 @@ void main() {
 
     tearDown(() => tempDir.deleteSync(recursive: true));
 
-    test('calls dynamic prompt function with orchestrator FileContext',
-        () async {
-      FileContext? capturedCtx;
-      final agent = _FakeAgent();
-      final orch = Orchestrator(
-        context: ctx,
-        steps: [
-          AgentStep.dynamic(
-            agent: agent,
-            taskPrompt: (c) async {
-              capturedCtx = c;
-              return 'dynamic task';
-            },
-          ),
-        ],
-      );
-      await orch.run();
-      expect(capturedCtx, isNotNull);
-      expect(capturedCtx, same(ctx));
-    });
+    test(
+      'calls dynamic prompt function with orchestrator FileContext',
+      () async {
+        FileContext? capturedCtx;
+        final agent = FakeAgent();
+        final orch = Orchestrator(
+          context: ctx,
+          steps: [
+            AgentStep.dynamic(
+              agent: agent,
+              taskPrompt: (c) async {
+                capturedCtx = c;
+                return 'dynamic task';
+              },
+            ),
+          ],
+        );
+        await orch.run();
+        expect(capturedCtx, isNotNull);
+        expect(capturedCtx, same(ctx));
+      },
+    );
 
     test('resolved dynamic prompt is passed to agent.run()', () async {
-      final agent = _FakeAgent();
+      final agent = FakeAgent();
       final orch = Orchestrator(
         context: ctx,
         steps: [
@@ -317,7 +266,7 @@ void main() {
     test('dynamic prompt can read FileContext to build task string', () async {
       ctx.write('config.txt', 'model: gpt-4');
 
-      final agent = _FakeAgent();
+      final agent = FakeAgent();
       final orch = Orchestrator(
         context: ctx,
         steps: [
@@ -336,7 +285,7 @@ void main() {
 
     test('prompt function is awaited before agent.run() is called', () async {
       var promptResolved = false;
-      final agent = _FakeAgent();
+      final agent = FakeAgent();
 
       final orch = Orchestrator(
         context: ctx,
@@ -372,7 +321,7 @@ void main() {
     tearDown(() => tempDir.deleteSync(recursive: true));
 
     test('step with no condition is always executed', () async {
-      final agent = _FakeAgent();
+      final agent = FakeAgent();
       final orch = Orchestrator(
         context: ctx,
         steps: [AgentStep(agent: agent, taskPrompt: 'task')],
@@ -382,7 +331,7 @@ void main() {
     });
 
     test('step is executed when condition returns true', () async {
-      final agent = _FakeAgent();
+      final agent = FakeAgent();
       final orch = Orchestrator(
         context: ctx,
         steps: [
@@ -398,7 +347,7 @@ void main() {
     });
 
     test('step is skipped when condition returns false', () async {
-      final agent = _FakeAgent();
+      final agent = FakeAgent();
       final orch = Orchestrator(
         context: ctx,
         steps: [
@@ -415,7 +364,7 @@ void main() {
 
     test('condition receives the orchestrator FileContext', () async {
       FileContext? capturedCtx;
-      final agent = _FakeAgent();
+      final agent = FakeAgent();
       final orch = Orchestrator(
         context: ctx,
         steps: [
@@ -438,7 +387,7 @@ void main() {
       // Write flag file — step should execute
       ctx.write('run_step.flag', '1');
 
-      final agent = _FakeAgent();
+      final agent = FakeAgent();
       final orch = Orchestrator(
         context: ctx,
         steps: [
@@ -454,8 +403,8 @@ void main() {
     });
 
     test('skipped step does not appear in stepResults', () async {
-      final skipped = _FakeAgent(name: 'skipped');
-      final executed = _FakeAgent(name: 'executed');
+      final skipped = FakeAgent(name: 'skipped');
+      final executed = FakeAgent(name: 'executed');
       final orch = Orchestrator(
         context: ctx,
         steps: [
@@ -474,66 +423,68 @@ void main() {
       expect(executed.callCount, 1);
     });
 
-    test('mix of skipped and executed steps preserves execution order',
-        () async {
-      final executionLog = <String>[];
+    test(
+      'mix of skipped and executed steps preserves execution order',
+      () async {
+        final executionLog = <String>[];
 
-      final a1 = _FakeAgent(
+        final a1 = FakeAgent.single(
           name: 'a1',
-          result: AgentResult(
-            output: 'a1',
-            filesModified: const [],
-          ));
-      final a2 = _FakeAgent(
+          result: AgentResult(output: 'a1', filesModified: const []),
+        );
+        final a2 = FakeAgent.single(
           name: 'a2',
-          result: const AgentResult(output: 'a2'));
-      final a3 = _FakeAgent(
+          result: const AgentResult(output: 'a2'),
+        );
+        final a3 = FakeAgent.single(
           name: 'a3',
-          result: const AgentResult(output: 'a3'));
+          result: const AgentResult(output: 'a3'),
+        );
 
-      final orch = Orchestrator(
-        context: ctx,
-        steps: [
-          AgentStep(
-            agent: a1,
-            taskPrompt: 'first',
-            condition: (c) async {
-              executionLog.add('check-a1');
-              return true;
-            },
-          ),
-          AgentStep(
-            agent: a2,
-            taskPrompt: 'second',
-            condition: (c) async {
-              executionLog.add('check-a2');
-              return false;
-            },
-          ),
-          AgentStep(
-            agent: a3,
-            taskPrompt: 'third',
-            condition: (c) async {
-              executionLog.add('check-a3');
-              return true;
-            },
-          ),
-        ],
-      );
+        final orch = Orchestrator(
+          context: ctx,
+          steps: [
+            AgentStep(
+              agent: a1,
+              taskPrompt: 'first',
+              condition: (c) async {
+                executionLog.add('check-a1');
+                return true;
+              },
+            ),
+            AgentStep(
+              agent: a2,
+              taskPrompt: 'second',
+              condition: (c) async {
+                executionLog.add('check-a2');
+                return false;
+              },
+            ),
+            AgentStep(
+              agent: a3,
+              taskPrompt: 'third',
+              condition: (c) async {
+                executionLog.add('check-a3');
+                return true;
+              },
+            ),
+          ],
+        );
 
-      final result = await orch.run();
+        final result = await orch.run();
 
-      // All conditions checked in order
-      expect(executionLog, ['check-a1', 'check-a2', 'check-a3']);
-      // Only a1 and a3 ran
-      expect(a1.callCount, 1);
-      expect(a2.callCount, 0);
-      expect(a3.callCount, 1);
-      // stepResults has a1 and a3 outputs
-      expect(result.stepResults, hasLength(2));
-      expect(result.stepResults[0].output, 'a1');
-      expect(result.stepResults[1].output, 'a3');
-    });
+        // All conditions checked in order
+        expect(executionLog, ['check-a1', 'check-a2', 'check-a3']);
+        // Only a1 and a3 ran
+        expect(a1.callCount, 1);
+        expect(a2.callCount, 0);
+        expect(a3.callCount, 1);
+        // stepResults has a1 and a3 outputs
+        expect(result.stepResults, hasLength(2));
+        expect(result.stepResults[0].output, 'a1');
+        expect(result.stepResults[1].output, 'a3');
+      },
+    );
   });
 
   // ── OrchestratorResult structure ──────────────────────────────────────────
@@ -557,8 +508,14 @@ void main() {
       final orch = Orchestrator(
         context: ctx,
         steps: [
-          AgentStep(agent: _FakeAgent(result: r1), taskPrompt: 'task1'),
-          AgentStep(agent: _FakeAgent(result: r2), taskPrompt: 'task2'),
+          AgentStep(
+            agent: FakeAgent.single(result: r1),
+            taskPrompt: 'task1',
+          ),
+          AgentStep(
+            agent: FakeAgent.single(result: r2),
+            taskPrompt: 'task2',
+          ),
         ],
       );
       final result = await orch.run();
@@ -573,7 +530,7 @@ void main() {
     test('duration is non-negative', () async {
       final orch = Orchestrator(
         context: ctx,
-        steps: [AgentStep(agent: _FakeAgent(), taskPrompt: 'task')],
+        steps: [AgentStep(agent: FakeAgent(), taskPrompt: 'task')],
       );
       final result = await orch.run();
       expect(result.duration.inMicroseconds, greaterThanOrEqualTo(0));
@@ -584,8 +541,8 @@ void main() {
       final orch = Orchestrator(
         context: ctx,
         steps: [
-          AgentStep(agent: _FakeAgent(), taskPrompt: 'step1'),
-          AgentStep(agent: _FakeAgent(), taskPrompt: 'step2'),
+          AgentStep(agent: FakeAgent(), taskPrompt: 'step1'),
+          AgentStep(agent: FakeAgent(), taskPrompt: 'step2'),
         ],
       );
       final before = DateTime.now();
@@ -609,7 +566,7 @@ void main() {
     test('errors is empty when all steps succeed', () async {
       final orch = Orchestrator(
         context: ctx,
-        steps: [AgentStep(agent: _FakeAgent(), taskPrompt: 'task')],
+        steps: [AgentStep(agent: FakeAgent(), taskPrompt: 'task')],
       );
       final result = await orch.run();
       expect(result.errors, isEmpty);
@@ -618,7 +575,7 @@ void main() {
     test('hasErrors is false when all steps succeed', () async {
       final orch = Orchestrator(
         context: ctx,
-        steps: [AgentStep(agent: _FakeAgent(), taskPrompt: 'task')],
+        steps: [AgentStep(agent: FakeAgent(), taskPrompt: 'task')],
       );
       final result = await orch.run();
       expect(result.hasErrors, isFalse);
@@ -645,7 +602,7 @@ void main() {
         context: ctx,
         steps: [
           AgentStep(
-            agent: _FakeAgent(throwError: error),
+            agent: FakeAgent.throwing(error: error),
             taskPrompt: 'task',
           ),
         ],
@@ -654,12 +611,12 @@ void main() {
     });
 
     test('stops execution after failing step', () async {
-      final afterAgent = _FakeAgent(name: 'after');
+      final afterAgent = FakeAgent(name: 'after');
       final orch = Orchestrator(
         context: ctx,
         steps: [
           AgentStep(
-            agent: _FakeAgent(throwError: Exception('oops')),
+            agent: FakeAgent.throwing(error: Exception('oops')),
             taskPrompt: 'step1',
           ),
           AgentStep(agent: afterAgent, taskPrompt: 'step2'),
@@ -677,7 +634,7 @@ void main() {
         context: ctx,
         steps: [
           AgentStep(
-            agent: _FakeAgent(throwError: error),
+            agent: FakeAgent.throwing(error: error),
             taskPrompt: 'task',
           ),
         ],
@@ -706,7 +663,7 @@ void main() {
         onError: OrchestratorErrorPolicy.continueOnError,
         steps: [
           AgentStep(
-            agent: _FakeAgent(throwError: Exception('fail')),
+            agent: FakeAgent.throwing(error: Exception('fail')),
             taskPrompt: 'task',
           ),
         ],
@@ -715,13 +672,13 @@ void main() {
     });
 
     test('continues executing subsequent steps after a failure', () async {
-      final afterAgent = _FakeAgent(name: 'after');
+      final afterAgent = FakeAgent(name: 'after');
       final orch = Orchestrator(
         context: ctx,
         onError: OrchestratorErrorPolicy.continueOnError,
         steps: [
           AgentStep(
-            agent: _FakeAgent(throwError: Exception('fail')),
+            agent: FakeAgent.throwing(error: Exception('fail')),
             taskPrompt: 'step1',
           ),
           AgentStep(agent: afterAgent, taskPrompt: 'step2'),
@@ -737,11 +694,11 @@ void main() {
         onError: OrchestratorErrorPolicy.continueOnError,
         steps: [
           AgentStep(
-            agent: _FakeAgent(throwError: Exception('fail')),
+            agent: FakeAgent.throwing(error: Exception('fail')),
             taskPrompt: 'step1',
           ),
           AgentStep(
-            agent: _FakeAgent(result: const AgentResult(output: 'ok')),
+            agent: FakeAgent.single(result: const AgentResult(output: 'ok')),
             taskPrompt: 'step2',
           ),
         ],
@@ -758,7 +715,7 @@ void main() {
         onError: OrchestratorErrorPolicy.continueOnError,
         steps: [
           AgentStep(
-            agent: _FakeAgent(throwError: error),
+            agent: FakeAgent.throwing(error: error),
             taskPrompt: 'step1',
           ),
         ],
@@ -774,7 +731,7 @@ void main() {
         onError: OrchestratorErrorPolicy.continueOnError,
         steps: [
           AgentStep(
-            agent: _FakeAgent(throwError: Exception('fail')),
+            agent: FakeAgent.throwing(error: Exception('fail')),
             taskPrompt: 'task',
           ),
         ],
@@ -791,11 +748,11 @@ void main() {
         onError: OrchestratorErrorPolicy.continueOnError,
         steps: [
           AgentStep(
-            agent: _FakeAgent(throwError: e1),
+            agent: FakeAgent.throwing(error: e1),
             taskPrompt: 'step1',
           ),
           AgentStep(
-            agent: _FakeAgent(throwError: e2),
+            agent: FakeAgent.throwing(error: e2),
             taskPrompt: 'step2',
           ),
         ],
@@ -805,32 +762,35 @@ void main() {
       expect(result.errors, containsAllInOrder([e1, e2]));
     });
 
-    test('mix of success and failure: correct stepResults and errors', () async {
-      final e = Exception('mid-fail');
-      final orch = Orchestrator(
-        context: ctx,
-        onError: OrchestratorErrorPolicy.continueOnError,
-        steps: [
-          AgentStep(
-            agent: _FakeAgent(result: const AgentResult(output: 'step1-ok')),
-            taskPrompt: 'step1',
-          ),
-          AgentStep(
-            agent: _FakeAgent(throwError: e),
-            taskPrompt: 'step2',
-          ),
-          AgentStep(
-            agent: _FakeAgent(result: const AgentResult(output: 'step3-ok')),
-            taskPrompt: 'step3',
-          ),
-        ],
-      );
-      final result = await orch.run();
-      expect(result.stepResults, hasLength(2));
-      expect(result.stepResults[0].output, 'step1-ok');
-      expect(result.stepResults[1].output, 'step3-ok');
-      expect(result.errors, hasLength(1));
-      expect(result.errors.first, same(e));
-    });
+    test(
+      'mix of success and failure: correct stepResults and errors',
+      () async {
+        final e = Exception('mid-fail');
+        final orch = Orchestrator(
+          context: ctx,
+          onError: OrchestratorErrorPolicy.continueOnError,
+          steps: [
+            AgentStep(
+              agent: FakeAgent.single(result: const AgentResult(output: 'step1-ok')),
+              taskPrompt: 'step1',
+            ),
+            AgentStep(
+              agent: FakeAgent.throwing(error: e),
+              taskPrompt: 'step2',
+            ),
+            AgentStep(
+              agent: FakeAgent.single(result: const AgentResult(output: 'step3-ok')),
+              taskPrompt: 'step3',
+            ),
+          ],
+        );
+        final result = await orch.run();
+        expect(result.stepResults, hasLength(2));
+        expect(result.stepResults[0].output, 'step1-ok');
+        expect(result.stepResults[1].output, 'step3-ok');
+        expect(result.errors, hasLength(1));
+        expect(result.errors.first, same(e));
+      },
+    );
   });
 }

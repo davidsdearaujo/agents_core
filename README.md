@@ -71,6 +71,34 @@ Future<void> main() async {
 }
 ```
 
+### Custom LLM providers
+
+All agents accept an `LlmClient` (abstract interface) rather than a concrete
+`LmStudioClient`. Implement `LlmClient` to plug in any provider (OpenAI,
+Anthropic, Ollama, etc.):
+
+```dart
+class MyOpenAiClient implements LlmClient {
+  @override
+  Future<ChatCompletionResponse> chatCompletion(ChatCompletionRequest request) async { ... }
+
+  @override
+  Stream<ChatCompletionChunk> chatCompletionStream(ChatCompletionRequest request) { ... }
+
+  @override
+  Stream<String> chatCompletionStreamText(ChatCompletionRequest request) { ... }
+
+  @override
+  void dispose() { ... }
+}
+
+final agent = SimpleAgent(
+  name: 'bot',
+  client: MyOpenAiClient(),
+  config: AgentsCoreConfig(),
+);
+```
+
 ### Multi-turn conversation
 
 Maintain chat history automatically across multiple exchanges:
@@ -170,12 +198,12 @@ final agent = ReActAgent(
 );
 
 final result = await agent.run('What is 2 + 2?');
-print(result.stoppedReason); // "terminal_tool"
+print(result.stoppedReason); // AgentStopReason.terminalTool
 ```
 
 When a terminal tool is called the tool executes normally, its result is
 appended to the conversation, and the loop breaks with
-`stoppedReason: "terminal_tool"`. Defaults to an empty set (no terminal tools).
+`stoppedReason: AgentStopReason.terminalTool`. Defaults to an empty set (no terminal tools).
 
 ### Multi-agent pipeline (Orchestrator)
 
@@ -235,6 +263,22 @@ Future<void> main() async {
   print('Duration: ${result.duration}');
   client.dispose();
 }
+```
+
+Use `AgentStep.dynamic` or `AgentLoopStep.dynamic` when the prompt must be
+built at runtime from files written by earlier steps:
+
+```dart
+AgentStep.dynamic(
+  agent: writer,
+  taskPrompt: (ctx) async => 'Summarise: ${ctx.read("research.txt")}',
+),
+AgentLoopStep.dynamic(
+  producer: developer,
+  reviewer: qa,
+  isAccepted: (result, _) => result.output.contains('APPROVED'),
+  taskPrompt: (ctx) async => 'Fix the bugs in:\n${ctx.read("errors.log")}',
+),
 ```
 
 ### Produce-review loop (AgentLoop)
@@ -385,7 +429,7 @@ Future<void> main() async {
 
   final result = await agent.run('Summarise the workspace files.');
   print(result.output);
-  print(result.stoppedReason); // "completed", "terminal_tool", "loop_detected", etc.
+  print(result.stoppedReason); // AgentStopReason.completed, .terminalTool, .loopDetected, etc.
 
   client.dispose();
 }
@@ -405,7 +449,7 @@ final loop = AgentLoop(
 );
 
 final result = await loop.run('Write a summary');
-print(result.stoppedReason); // "accepted", "max_iterations", or "loop_detected"
+print(result.stoppedReason); // AgentStopReason.accepted, .maxIterations, or .loopDetected
 print(result.loopDetected);  // true if stopped due to loop
 ```
 
@@ -413,17 +457,18 @@ print(result.loopDetected);  // true if stopped due to loop
 
 | Module | Key Classes | Description |
 |---|---|---|
-| **Agent** | `Agent`, `SimpleAgent`, `ReActAgent`, `AgentResult` | Define and run AI agents with tool calling |
-| **Client** | `LmStudioClient`, `LmStudioHttpClient`, `SseParser` | HTTP client for LM Studio's OpenAI-compatible API |
+| **Agent** | `Agent`, `SimpleAgent`, `ReActAgent`, `AgentResult`, `AgentStopReason` | Define and run AI agents with tool calling |
+| **Client** | `LlmClient`, `LmStudioClient`, `LmStudioHttpClient`, `SseParser` | LLM client interface and HTTP client for LM Studio's OpenAI-compatible API |
 | **Models** | `ChatMessage`, `ChatCompletionRequest`, `ChatCompletionResponse`, `ChatCompletionChunk`, `ToolDefinition`, `ToolCall`, `LmModel` | Request/response data structures |
-| **Config** | `AgentsCoreConfig`, `Logger`, `StderrLogger`, `SilentLogger` | Configuration and logging |
+| **Config** | `AgentsCoreConfig`, `LmStudioConfig`, `DockerConfig`, `LoggingConfig`, `Logger`, `StderrLogger`, `SilentLogger` | Configuration and logging |
 | **File Context** | `FileContext`, `readFileTool`, `writeFileTool`, `listFilesTool`, `createHandlers` | Sandboxed file operations with tool definitions |
-| **Orchestrator** | `Orchestrator`, `OrchestratorStep`, `AgentStep`, `AgentLoopStep`, `OrchestratorResult`, `StepResult`, `AgentStepResult`, `AgentLoopStepResult`, `OrchestratorErrorPolicy` | Sequential multi-agent pipelines with mixed step types |
+| **Orchestrator** | `Orchestrator`, `OrchestratorStep`, `AgentStep`, `AgentLoopStep`, `TaskPrompt`, `StaticPrompt`, `DynamicPrompt`, `OrchestratorResult`, `StepResult`, `AgentStepResult`, `AgentLoopStepResult`, `OrchestratorErrorPolicy` | Sequential multi-agent pipelines with mixed step types |
 | **AgentLoop** | `AgentLoop`, `AgentLoopIteration`, `AgentLoopResult` | Iterative produce-review refinement loop |
 | **Loop Detection** | `LoopDetectionConfig`, `LoopDetector`, `LoopCheckResult` | Detect and break repetitive LLM loops via tool-call fingerprinting and bigram similarity |
 | **Docker** | `DockerClient`, `DockerRunResult` | Container management for sandboxed execution |
 | **Python** | `PythonToolAgent`, `PythonExecutionTool` | Python code execution in Docker |
 | **Quick** | `ask`, `askStream`, `Conversation` | Convenience functions for common patterns |
+| **Utils** | `Disposable`, `TextSimilarity` | Resource lifecycle mixin and text similarity utilities |
 | **Exceptions** | `AgentsCoreException`, `LmStudioApiException`, `LmStudioConnectionException`, `FileNotFoundException`, `PathTraversalException` | Structured error hierarchy |
 
 ## Examples
@@ -460,6 +505,20 @@ You can also create configuration from environment variables:
 
 ```dart
 final config = AgentsCoreConfig.fromEnvironment();
+```
+
+Or compose it from focused sub-configs using `AgentsCoreConfig.fromConfigs`:
+
+```dart
+final config = AgentsCoreConfig.fromConfigs(
+  lmStudio: LmStudioConfig(
+    baseUrl: Uri.parse('http://localhost:1234'),
+    defaultModel: 'llama-3-8b',
+    apiKey: 'my-key',
+  ),
+  docker: DockerConfig(image: 'python:3.12-slim'),
+  logging: LoggingConfig(loggingEnabled: false),
+);
 ```
 
 Supported environment variables: `LM_STUDIO_BASE_URL`, `AGENTS_DEFAULT_MODEL`,

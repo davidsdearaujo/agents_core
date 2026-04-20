@@ -28,7 +28,8 @@ import '../models/tool_definition.dart';
 /// ```
 final ToolDefinition executePythonToolDefinition = ToolDefinition(
   name: 'execute_python',
-  description: 'Executes Python code in a sandboxed Docker container. '
+  description:
+      'Executes Python code in a sandboxed Docker container. '
       'Returns stdout, stderr, and exit code. '
       'Use this to run data analysis, computations, or scripts.',
   parameters: <String, dynamic>{
@@ -43,7 +44,7 @@ final ToolDefinition executePythonToolDefinition = ToolDefinition(
         'items': <String, dynamic>{'type': 'string'},
         'description':
             'Optional list of pip packages to install before execution '
-                '(e.g. ["numpy", "pandas==2.1.0"]).',
+            '(e.g. ["numpy", "pandas==2.1.0"]).',
       },
     },
     'required': <String>['code'],
@@ -112,8 +113,10 @@ ToolHandler createExecutePythonHandler({
     // Generate a unique temp filename to avoid collisions.
     final tempFileName = _generateTempFileName();
 
-    log.debug('execute_python: writing temp file $tempFileName '
-        '(${code.length} chars, ${requirements.length} requirements)');
+    log.debug(
+      'execute_python: writing temp file $tempFileName '
+      '(${code.length} chars, ${requirements.length} requirements)',
+    );
 
     try {
       // Step 1: Write code to a temp file in the workspace.

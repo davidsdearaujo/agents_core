@@ -24,6 +24,7 @@ import 'package:test/test.dart';
 void main() {
   // ─────────────────────────────────────────────────────────────────────────────
   // 1. Tool definition objects — identity and structure
+  //    NOTE: After M3 consolidation, parameter key is "path" (not "fileName")
   // ─────────────────────────────────────────────────────────────────────────────
   group('readFileTool', () {
     group('type', () {
@@ -53,22 +54,23 @@ void main() {
         expect(readFileTool.parameters['properties'], isA<Map>());
       });
 
-      test('"fileName" is a property', () {
+      test('"path" is a property (unified interface — not "fileName")', () {
         final props =
             readFileTool.parameters['properties'] as Map<String, dynamic>;
-        expect(props, contains('fileName'));
+        expect(props, contains('path'));
+        expect(props, isNot(contains('fileName')));
       });
 
-      test('"fileName" property has type "string"', () {
+      test('"path" property has type "string"', () {
         final props =
             readFileTool.parameters['properties'] as Map<String, dynamic>;
-        final fileNameProp = props['fileName'] as Map<String, dynamic>;
-        expect(fileNameProp['type'], equals('string'));
+        final pathProp = props['path'] as Map<String, dynamic>;
+        expect(pathProp['type'], equals('string'));
       });
 
-      test('"fileName" is listed in required', () {
+      test('"path" is listed in required', () {
         final required = readFileTool.parameters['required'] as List<dynamic>;
-        expect(required, contains('fileName'));
+        expect(required, contains('path'));
       });
     });
 
@@ -111,10 +113,11 @@ void main() {
         expect(writeFileTool.parameters['type'], equals('object'));
       });
 
-      test('"fileName" is a property', () {
+      test('"path" is a property (unified interface)', () {
         final props =
             writeFileTool.parameters['properties'] as Map<String, dynamic>;
-        expect(props, contains('fileName'));
+        expect(props, contains('path'));
+        expect(props, isNot(contains('fileName')));
       });
 
       test('"content" is a property', () {
@@ -123,10 +126,10 @@ void main() {
         expect(props, contains('content'));
       });
 
-      test('"fileName" property has type "string"', () {
+      test('"path" property has type "string"', () {
         final props =
             writeFileTool.parameters['properties'] as Map<String, dynamic>;
-        final prop = props['fileName'] as Map<String, dynamic>;
+        final prop = props['path'] as Map<String, dynamic>;
         expect(prop['type'], equals('string'));
       });
 
@@ -137,9 +140,9 @@ void main() {
         expect(prop['type'], equals('string'));
       });
 
-      test('"fileName" is listed in required', () {
+      test('"path" is listed in required', () {
         final required = writeFileTool.parameters['required'] as List<dynamic>;
-        expect(required, contains('fileName'));
+        expect(required, contains('path'));
       });
 
       test('"content" is listed in required', () {
@@ -219,10 +222,11 @@ void main() {
         expect(appendFileTool.parameters['type'], equals('object'));
       });
 
-      test('"fileName" is a property', () {
+      test('"path" is a property (unified interface)', () {
         final props =
             appendFileTool.parameters['properties'] as Map<String, dynamic>;
-        expect(props, contains('fileName'));
+        expect(props, contains('path'));
+        expect(props, isNot(contains('fileName')));
       });
 
       test('"content" is a property', () {
@@ -231,9 +235,9 @@ void main() {
         expect(props, contains('content'));
       });
 
-      test('"fileName" is listed in required', () {
+      test('"path" is listed in required', () {
         final required = appendFileTool.parameters['required'] as List<dynamic>;
-        expect(required, contains('fileName'));
+        expect(required, contains('path'));
       });
 
       test('"content" is listed in required', () {
@@ -244,7 +248,46 @@ void main() {
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // 2. createHandlers — structure
+  // 2. fileContextToolDefinitions getter (added in M3 consolidation)
+  // ─────────────────────────────────────────────────────────────────────────────
+  group('fileContextToolDefinitions', () {
+    test('returns a List<ToolDefinition>', () {
+      expect(fileContextToolDefinitions, isA<List<ToolDefinition>>());
+    });
+
+    test('returns exactly 4 definitions (read, write, list, append)', () {
+      expect(fileContextToolDefinitions, hasLength(4));
+    });
+
+    test('contains read_file', () {
+      final names = fileContextToolDefinitions.map((t) => t.name).toList();
+      expect(names, contains('read_file'));
+    });
+
+    test('contains write_file', () {
+      final names = fileContextToolDefinitions.map((t) => t.name).toList();
+      expect(names, contains('write_file'));
+    });
+
+    test('contains list_files', () {
+      final names = fileContextToolDefinitions.map((t) => t.name).toList();
+      expect(names, contains('list_files'));
+    });
+
+    test('contains append_file', () {
+      final names = fileContextToolDefinitions.map((t) => t.name).toList();
+      expect(names, contains('append_file'));
+    });
+
+    test('all entries are ToolDefinition instances', () {
+      for (final tool in fileContextToolDefinitions) {
+        expect(tool, isA<ToolDefinition>());
+      }
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // 3. createHandlers — structure
   // ─────────────────────────────────────────────────────────────────────────────
   group('createHandlers', () {
     late FileContext ctx;
@@ -293,15 +336,18 @@ void main() {
     test('each value is a function', () {
       final handlers = createHandlers(ctx);
       for (final entry in handlers.entries) {
-        expect(entry.value, isA<Function>(),
-            reason: 'handler "${entry.key}" should be a Function');
+        expect(
+          entry.value,
+          isA<Function>(),
+          reason: 'handler "${entry.key}" should be a Function',
+        );
       }
     });
 
     test('calling any handler returns a Future<String>', () async {
       final handlers = createHandlers(ctx);
       ctx.write('probe.txt', 'x');
-      final result = await handlers['read_file']!({'fileName': 'probe.txt'});
+      final result = await handlers['read_file']!({'path': 'probe.txt'});
       expect(result, isA<String>());
     });
 
@@ -314,11 +360,10 @@ void main() {
       final h2 = createHandlers(ctx2);
 
       // Write to ctx1 only.
-      await h1['write_file']!(
-          {'fileName': 'only_in_ctx1.txt', 'content': 'x'});
+      await h1['write_file']!({'path': 'only_in_ctx1.txt', 'content': 'x'});
 
       // ctx2 should not have the file.
-      final result = await h2['read_file']!({'fileName': 'only_in_ctx1.txt'});
+      final result = await h2['read_file']!({'path': 'only_in_ctx1.txt'});
       // Expect an error string, not the content.
       expect(result.toLowerCase(), contains('error'));
 
@@ -327,12 +372,66 @@ void main() {
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // 3. write_file handler
+  // 4. createFileContextHandlers — named-param alias (added in M3 consolidation)
+  // ─────────────────────────────────────────────────────────────────────────────
+  group('createFileContextHandlers (named-param alias)', () {
+    late FileContext ctx;
+    late Directory dir;
+
+    setUp(() {
+      final tmp = _tempContext();
+      ctx = tmp.ctx;
+      dir = tmp.dir;
+    });
+
+    tearDown(() {
+      dir.deleteSync(recursive: true);
+    });
+
+    test('accepts named "context:" parameter', () {
+      expect(() => createFileContextHandlers(context: ctx), returnsNormally);
+    });
+
+    test('returns the same 4 handlers as createHandlers', () {
+      final h1 = createHandlers(ctx);
+      final h2 = createFileContextHandlers(context: ctx);
+      expect(h2.keys.toSet(), equals(h1.keys.toSet()));
+    });
+
+    test('produces functionally identical results to createHandlers', () async {
+      ctx.write('test.txt', 'hello');
+
+      final h1 = createHandlers(ctx);
+      final h2 = createFileContextHandlers(context: ctx);
+
+      final r1 = await h1['read_file']!({'path': 'test.txt'});
+      final r2 = await h2['read_file']!({'path': 'test.txt'});
+      expect(r1, equals(r2));
+    });
+
+    test('independent contexts remain independent', () async {
+      final tmp2 = _tempContext();
+      final ctx2 = tmp2.ctx;
+      final dir2 = tmp2.dir;
+
+      final h1 = createFileContextHandlers(context: ctx);
+      final h2 = createFileContextHandlers(context: ctx2);
+
+      await h1['write_file']!({'path': 'unique.txt', 'content': 'x'});
+      final result = await h2['read_file']!({'path': 'unique.txt'});
+      expect(result.toLowerCase(), contains('error'));
+
+      dir2.deleteSync(recursive: true);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // 5. write_file handler
   // ─────────────────────────────────────────────────────────────────────────────
   group('write_file handler', () {
     late FileContext ctx;
     late Directory dir;
-    late Map<String, Future<String> Function(Map<String, dynamic>)> handlers;
+    late Map<String, ToolHandler> handlers;
 
     setUp(() {
       final tmp = _tempContext();
@@ -346,79 +445,103 @@ void main() {
     });
 
     test('returns a non-empty string on success', () async {
-      final result = await handlers['write_file']!(
-          {'fileName': 'hello.txt', 'content': 'Hello, world!'});
+      final result = await handlers['write_file']!({
+        'path': 'hello.txt',
+        'content': 'Hello, world!',
+      });
       expect(result, isNotEmpty);
     });
 
-    test('success message mentions the file name', () async {
-      final result = await handlers['write_file']!(
-          {'fileName': 'notes.md', 'content': 'Some notes here.'});
+    test('success message mentions the file path', () async {
+      final result = await handlers['write_file']!({
+        'path': 'notes.md',
+        'content': 'Some notes here.',
+      });
       expect(result, contains('notes.md'));
     });
 
-    test('success message mentions the byte count', () async {
+    test('success message mentions the character count', () async {
       const content = 'Hello world';
-      final result = await handlers['write_file']!(
-          {'fileName': 'size.txt', 'content': content});
+      final result = await handlers['write_file']!({
+        'path': 'size.txt',
+        'content': content,
+      });
       expect(result, contains('${content.length}'));
     });
 
     test('file is actually created in the workspace', () async {
-      await handlers['write_file']!(
-          {'fileName': 'created.txt', 'content': 'content here'});
+      await handlers['write_file']!({
+        'path': 'created.txt',
+        'content': 'content here',
+      });
       expect(ctx.exists('created.txt'), isTrue);
     });
 
     test('file content matches what was written', () async {
       const content = 'exact content to verify';
-      await handlers['write_file']!(
-          {'fileName': 'verify.txt', 'content': content});
+      await handlers['write_file']!({'path': 'verify.txt', 'content': content});
       expect(ctx.read('verify.txt'), equals(content));
     });
 
     test('overwrites an existing file', () async {
-      await handlers['write_file']!(
-          {'fileName': 'overwrite.txt', 'content': 'original'});
-      await handlers['write_file']!(
-          {'fileName': 'overwrite.txt', 'content': 'updated'});
+      await handlers['write_file']!({
+        'path': 'overwrite.txt',
+        'content': 'original',
+      });
+      await handlers['write_file']!({
+        'path': 'overwrite.txt',
+        'content': 'updated',
+      });
       expect(ctx.read('overwrite.txt'), equals('updated'));
     });
 
     test('can write empty content', () async {
-      final result =
-          await handlers['write_file']!({'fileName': 'empty.txt', 'content': ''});
+      final result = await handlers['write_file']!({
+        'path': 'empty.txt',
+        'content': '',
+      });
       expect(result, isNotEmpty);
       expect(ctx.exists('empty.txt'), isTrue);
     });
 
     test('can write multi-line content', () async {
       const content = 'line1\nline2\nline3';
-      await handlers['write_file']!(
-          {'fileName': 'multi.txt', 'content': content});
+      await handlers['write_file']!({'path': 'multi.txt', 'content': content});
       expect(ctx.read('multi.txt'), equals(content));
     });
 
+    test('returns error string when path is empty', () async {
+      final result = await handlers['write_file']!({
+        'path': '',
+        'content': 'data',
+      });
+      expect(result.toLowerCase(), contains('error'));
+    });
+
     test('returns error string on path traversal attempt', () async {
-      final result = await handlers['write_file']!(
-          {'fileName': '../escaped.txt', 'content': 'bad'});
+      final result = await handlers['write_file']!({
+        'path': '../escaped.txt',
+        'content': 'bad',
+      });
       expect(result.toLowerCase(), contains('error'));
     });
 
     test('path traversal does NOT write a file', () async {
-      await handlers['write_file']!(
-          {'fileName': '../escaped.txt', 'content': 'bad'});
+      await handlers['write_file']!({
+        'path': '../escaped.txt',
+        'content': 'bad',
+      });
       expect(File('${dir.parent.path}/escaped.txt').existsSync(), isFalse);
     });
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // 4. read_file handler
+  // 6. read_file handler
   // ─────────────────────────────────────────────────────────────────────────────
   group('read_file handler', () {
     late FileContext ctx;
     late Directory dir;
-    late Map<String, Future<String> Function(Map<String, dynamic>)> handlers;
+    late Map<String, ToolHandler> handlers;
 
     setUp(() {
       final tmp = _tempContext();
@@ -433,61 +556,61 @@ void main() {
 
     test('returns file contents when file exists', () async {
       ctx.write('greet.txt', 'Hello from file!');
-      final result =
-          await handlers['read_file']!({'fileName': 'greet.txt'});
+      final result = await handlers['read_file']!({'path': 'greet.txt'});
       expect(result, contains('Hello from file!'));
     });
 
     test('returns the exact file content', () async {
       const content = 'exact content\nwith newlines\nand more';
       ctx.write('exact.txt', content);
-      final result =
-          await handlers['read_file']!({'fileName': 'exact.txt'});
+      final result = await handlers['read_file']!({'path': 'exact.txt'});
       expect(result, equals(content));
     });
 
     test('returns error string when file does not exist', () async {
-      final result =
-          await handlers['read_file']!({'fileName': 'nonexistent.txt'});
+      final result = await handlers['read_file']!({'path': 'nonexistent.txt'});
       expect(result.toLowerCase(), contains('error'));
     });
 
-    test('error string mentions the file name on not-found', () async {
-      final result =
-          await handlers['read_file']!({'fileName': 'missing_file.txt'});
+    test('error string mentions the file path on not-found', () async {
+      final result = await handlers['read_file']!({'path': 'missing_file.txt'});
       expect(result, contains('missing_file.txt'));
     });
 
+    test('returns error string when path is empty', () async {
+      final result = await handlers['read_file']!({'path': ''});
+      expect(result.toLowerCase(), contains('error'));
+    });
+
     test('returns error string on path traversal attempt', () async {
-      final result =
-          await handlers['read_file']!({'fileName': '../secret.txt'});
+      final result = await handlers['read_file']!({'path': '../secret.txt'});
       expect(result.toLowerCase(), contains('error'));
     });
 
     test('can read a file previously written via write_file handler', () async {
       const content = 'written by handler';
-      await handlers['write_file']!(
-          {'fileName': 'roundtrip.txt', 'content': content});
-      final result =
-          await handlers['read_file']!({'fileName': 'roundtrip.txt'});
+      await handlers['write_file']!({
+        'path': 'roundtrip.txt',
+        'content': content,
+      });
+      final result = await handlers['read_file']!({'path': 'roundtrip.txt'});
       expect(result, equals(content));
     });
 
     test('can read empty file', () async {
       ctx.write('empty.txt', '');
-      final result =
-          await handlers['read_file']!({'fileName': 'empty.txt'});
+      final result = await handlers['read_file']!({'path': 'empty.txt'});
       expect(result, equals(''));
     });
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // 5. list_files handler
+  // 7. list_files handler
   // ─────────────────────────────────────────────────────────────────────────────
   group('list_files handler', () {
     late FileContext ctx;
     late Directory dir;
-    late Map<String, Future<String> Function(Map<String, dynamic>)> handlers;
+    late Map<String, ToolHandler> handlers;
 
     setUp(() {
       final tmp = _tempContext();
@@ -505,9 +628,14 @@ void main() {
       expect(result, isA<String>());
     });
 
-    test('empty workspace returns a string (no crash)', () async {
+    test('empty workspace returns a non-empty string (no crash)', () async {
       final result = await handlers['list_files']!({});
       expect(result, isNotEmpty);
+    });
+
+    test('empty workspace returns "Workspace is empty."', () async {
+      final result = await handlers['list_files']!({});
+      expect(result, equals('Workspace is empty.'));
     });
 
     test('lists files that exist in the workspace', () async {
@@ -556,12 +684,15 @@ void main() {
       expect(resultNullGlob, contains('file.txt'));
     });
 
-    test('glob with no matches returns string (no crash)', () async {
-      ctx.write('readme.md', 'md');
-      final result = await handlers['list_files']!({'glob': '*.dart'});
-      // Should return something (e.g., "No files found" or empty listing).
-      expect(result, isA<String>());
-    });
+    test(
+      'glob with no matches returns descriptive string (no crash)',
+      () async {
+        ctx.write('readme.md', 'md');
+        final result = await handlers['list_files']!({'glob': '*.dart'});
+        expect(result, isA<String>());
+        expect(result, isNotEmpty);
+      },
+    );
 
     test('nested files are included in listing', () async {
       ctx.write('subdir/nested.txt', 'nested content');
@@ -571,12 +702,12 @@ void main() {
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // 6. append_file handler
+  // 8. append_file handler
   // ─────────────────────────────────────────────────────────────────────────────
   group('append_file handler', () {
     late FileContext ctx;
     late Directory dir;
-    late Map<String, Future<String> Function(Map<String, dynamic>)> handlers;
+    late Map<String, ToolHandler> handlers;
 
     setUp(() {
       final tmp = _tempContext();
@@ -591,59 +722,73 @@ void main() {
 
     test('returns a non-empty string on success', () async {
       ctx.write('log.txt', 'initial');
-      final result = await handlers['append_file']!(
-          {'fileName': 'log.txt', 'content': ' appended'});
+      final result = await handlers['append_file']!({
+        'path': 'log.txt',
+        'content': ' appended',
+      });
       expect(result, isNotEmpty);
     });
 
-    test('success message mentions the file name', () async {
+    test('success message mentions the file path', () async {
       ctx.write('log.txt', 'initial');
-      final result = await handlers['append_file']!(
-          {'fileName': 'log.txt', 'content': ' more'});
+      final result = await handlers['append_file']!({
+        'path': 'log.txt',
+        'content': ' more',
+      });
       expect(result, contains('log.txt'));
     });
 
     test('content is appended after existing content', () async {
       ctx.write('log.txt', 'line1');
-      await handlers['append_file']!(
-          {'fileName': 'log.txt', 'content': '\nline2'});
+      await handlers['append_file']!({'path': 'log.txt', 'content': '\nline2'});
       expect(ctx.read('log.txt'), equals('line1\nline2'));
     });
 
     test('creates file if it does not exist', () async {
-      await handlers['append_file']!(
-          {'fileName': 'new.txt', 'content': 'first write'});
+      await handlers['append_file']!({
+        'path': 'new.txt',
+        'content': 'first write',
+      });
       expect(ctx.exists('new.txt'), isTrue);
       expect(ctx.read('new.txt'), equals('first write'));
     });
 
     test('multiple appends accumulate in order', () async {
-      await handlers['append_file']!(
-          {'fileName': 'accum.txt', 'content': 'A'});
-      await handlers['append_file']!(
-          {'fileName': 'accum.txt', 'content': 'B'});
-      await handlers['append_file']!(
-          {'fileName': 'accum.txt', 'content': 'C'});
+      await handlers['append_file']!({'path': 'accum.txt', 'content': 'A'});
+      await handlers['append_file']!({'path': 'accum.txt', 'content': 'B'});
+      await handlers['append_file']!({'path': 'accum.txt', 'content': 'C'});
       expect(ctx.read('accum.txt'), equals('ABC'));
     });
 
-    test('success message mentions byte count', () async {
+    test('success message mentions character count', () async {
       const appended = 'exactly 12 chars';
       ctx.write('bytes.txt', '');
-      final result = await handlers['append_file']!(
-          {'fileName': 'bytes.txt', 'content': appended});
+      final result = await handlers['append_file']!({
+        'path': 'bytes.txt',
+        'content': appended,
+      });
       expect(result, contains('${appended.length}'));
     });
 
+    test('returns error string when path is empty', () async {
+      final result = await handlers['append_file']!({
+        'path': '',
+        'content': 'x',
+      });
+      expect(result.toLowerCase(), contains('error'));
+    });
+
     test('returns error string on path traversal attempt', () async {
-      final result = await handlers['append_file']!(
-          {'fileName': '../bad.txt', 'content': 'x'});
+      final result = await handlers['append_file']!({
+        'path': '../bad.txt',
+        'content': 'x',
+      });
       expect(result.toLowerCase(), contains('error'));
     });
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // 7. Handler key names match tool definition names
+  // 9. Handler key names match tool definition names
   // ─────────────────────────────────────────────────────────────────────────────
   group('handler keys match tool definition names', () {
     late FileContext ctx;
@@ -678,17 +823,30 @@ void main() {
       final handlers = createHandlers(ctx);
       expect(handlers, contains(appendFileTool.name));
     });
+
+    test('all fileContextToolDefinitions names have a handler', () {
+      final handlers = createHandlers(ctx);
+      for (final tool in fileContextToolDefinitions) {
+        expect(
+          handlers,
+          contains(tool.name),
+          reason: 'handler for "${tool.name}" should be in createHandlers',
+        );
+      }
+    });
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // 8. Tool definitions are exported from the barrel
+  // 10. Tool definitions are exported from the barrel
   // ─────────────────────────────────────────────────────────────────────────────
   group('barrel export verification', () {
-    test('readFileTool is accessible from package:agents_core/agents_core.dart',
-        () {
-      // Just accessing the identifier via the import above proves it.
-      expect(readFileTool.name, equals('read_file'));
-    });
+    test(
+      'readFileTool is accessible from package:agents_core/agents_core.dart',
+      () {
+        // Just accessing the identifier via the import above proves it.
+        expect(readFileTool.name, equals('read_file'));
+      },
+    );
 
     test('writeFileTool is accessible from barrel', () {
       expect(writeFileTool.name, equals('write_file'));
@@ -704,6 +862,14 @@ void main() {
 
     test('createHandlers is accessible from barrel', () {
       expect(createHandlers, isA<Function>());
+    });
+
+    test('createFileContextHandlers is accessible from barrel', () {
+      expect(createFileContextHandlers, isA<Function>());
+    });
+
+    test('fileContextToolDefinitions getter is accessible from barrel', () {
+      expect(fileContextToolDefinitions, isA<List<ToolDefinition>>());
     });
   });
 }

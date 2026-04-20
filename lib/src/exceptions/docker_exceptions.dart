@@ -100,6 +100,5 @@ class DockerImageNotFoundException implements Exception {
   final String image;
 
   @override
-  String toString() =>
-      'DockerImageNotFoundException: $message (image=$image)';
+  String toString() => 'DockerImageNotFoundException: $message (image=$image)';
 }

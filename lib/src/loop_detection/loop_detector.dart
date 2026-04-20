@@ -1,4 +1,5 @@
 import '../models/tool_call.dart';
+import '../utils/text_similarity.dart';
 import 'loop_detection_config.dart';
 
 /// The result of a loop-detection check.
@@ -75,8 +76,7 @@ class LoopDetector {
       final name = tc.function?.name ?? '';
       final args = tc.function?.arguments ?? '';
       return '$name:$args';
-    }).toList()
-      ..sort();
+    }).toList()..sort();
 
     _toolCallHistory.add(fingerprints.join('|'));
   }
@@ -102,13 +102,15 @@ class LoopDetector {
     // ── Check tool-call repetition ──────────────────────────────────────
     final toolThreshold = config.maxConsecutiveIdenticalToolCalls;
     if (toolThreshold > 0 && _toolCallHistory.length >= toolThreshold) {
-      final recent =
-          _toolCallHistory.sublist(_toolCallHistory.length - toolThreshold);
+      final recent = _toolCallHistory.sublist(
+        _toolCallHistory.length - toolThreshold,
+      );
       final last = recent.last;
       if (last.isNotEmpty && recent.every((fp) => fp == last)) {
         return LoopCheckResult(
           isLooping: true,
-          reason: 'Detected $toolThreshold consecutive identical '
+          reason:
+              'Detected $toolThreshold consecutive identical '
               'tool-call sequences',
         );
       }
@@ -117,16 +119,20 @@ class LoopDetector {
     // ── Check output repetition ─────────────────────────────────────────
     final outputThreshold = config.maxConsecutiveIdenticalOutputs;
     if (outputThreshold > 0 && _outputHistory.length >= outputThreshold) {
-      final recent =
-          _outputHistory.sublist(_outputHistory.length - outputThreshold);
+      final recent = _outputHistory.sublist(
+        _outputHistory.length - outputThreshold,
+      );
       final reference = recent.last;
       if (reference.isNotEmpty &&
-          recent.every((output) =>
-              bigramSimilarity(output, reference) >=
-              config.similarityThreshold)) {
+          recent.every(
+            (output) =>
+                TextSimilarity.bigram(output, reference) >=
+                config.similarityThreshold,
+          )) {
         return LoopCheckResult(
           isLooping: true,
-          reason: 'Detected $outputThreshold consecutive near-identical '
+          reason:
+              'Detected $outputThreshold consecutive near-identical '
               'outputs (similarity >= ${config.similarityThreshold})',
         );
       }
@@ -141,51 +147,5 @@ class LoopDetector {
   void reset() {
     _toolCallHistory.clear();
     _outputHistory.clear();
-  }
-
-  /// Computes the bigram similarity between two strings.
-  ///
-  /// Returns a value between 0.0 (completely different) and 1.0 (identical
-  /// bigram sets). This is a variant of the Sørensen–Dice coefficient
-  /// computed over character bigrams.
-  ///
-  /// Two empty strings are considered identical (returns 1.0). If exactly
-  /// one string is empty, returns 0.0. Strings shorter than 2 characters
-  /// are compared by equality.
-  ///
-  /// ```dart
-  /// LoopDetector.bigramSimilarity('hello', 'hello'); // 1.0
-  /// LoopDetector.bigramSimilarity('hello', 'world'); // ~0.0
-  /// LoopDetector.bigramSimilarity('night', 'nacht'); // ~0.25
-  /// ```
-  static double bigramSimilarity(String a, String b) {
-    if (a == b) return 1.0;
-    if (a.isEmpty || b.isEmpty) return 0.0;
-    if (a.length < 2 || b.length < 2) return a == b ? 1.0 : 0.0;
-
-    final bigramsA = _buildBigramMultiset(a);
-    final bigramsB = _buildBigramMultiset(b);
-
-    // Count shared bigrams (intersection of multisets).
-    var intersectionSize = 0;
-    for (final entry in bigramsA.entries) {
-      final countInB = bigramsB[entry.key] ?? 0;
-      if (countInB > 0) {
-        intersectionSize += entry.value < countInB ? entry.value : countInB;
-      }
-    }
-
-    final totalSize = a.length - 1 + b.length - 1;
-    return (2 * intersectionSize) / totalSize;
-  }
-
-  /// Builds a multiset (frequency map) of character bigrams from [s].
-  static Map<String, int> _buildBigramMultiset(String s) {
-    final bigrams = <String, int>{};
-    for (var i = 0; i < s.length - 1; i++) {
-      final bigram = s.substring(i, i + 2);
-      bigrams[bigram] = (bigrams[bigram] ?? 0) + 1;
-    }
-    return bigrams;
   }
 }

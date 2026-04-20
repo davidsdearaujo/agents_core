@@ -113,10 +113,7 @@ class ChatMessage {
   /// The `tool_call_id` and `tool_calls` keys are omitted when their
   /// respective fields are `null`.
   Map<String, dynamic> toJson() {
-    final json = <String, dynamic>{
-      'role': role.value,
-      'content': content,
-    };
+    final json = <String, dynamic>{'role': role.value, 'content': content};
     if (toolCallId != null) {
       json['tool_call_id'] = toolCallId;
     }

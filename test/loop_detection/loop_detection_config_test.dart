@@ -28,8 +28,11 @@ void main() {
         // Verify the const constructor works at compile time and runtime.
         const c1 = LoopDetectionConfig();
         const c2 = LoopDetectionConfig();
-        expect(identical(c1, c2), isTrue,
-            reason: 'const instances with same args should be identical');
+        expect(
+          identical(c1, c2),
+          isTrue,
+          reason: 'const instances with same args should be identical',
+        );
       });
     });
 

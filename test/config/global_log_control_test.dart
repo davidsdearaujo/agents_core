@@ -115,16 +115,17 @@ void main() {
     });
 
     test(
-        'default config with loggingEnabled: true passes through logger messages',
-        () {
-      final config = AgentsCoreConfig(loggingEnabled: true);
-      // Replace default logger with debug level so we can capture output.
-      final debugConfig = config.copyWith(
-        logger: const StderrLogger(level: LogLevel.debug),
-      );
-      final out = captureStderr(() => debugConfig.logger.info('logs-on'));
-      expect(out, contains('logs-on'));
-    });
+      'default config with loggingEnabled: true passes through logger messages',
+      () {
+        final config = AgentsCoreConfig(loggingEnabled: true);
+        // Replace default logger with debug level so we can capture output.
+        final debugConfig = config.copyWith(
+          logger: const StderrLogger(level: LogLevel.debug),
+        );
+        final out = captureStderr(() => debugConfig.logger.info('logs-on'));
+        expect(out, contains('logs-on'));
+      },
+    );
 
     test('default StderrLogger emits warn messages when logging enabled', () {
       final config = AgentsCoreConfig(
@@ -281,45 +282,49 @@ void main() {
     });
 
     test(
-        'multiple toggle: disable → enable → disable retains correct flag each step',
-        () {
-      final base = AgentsCoreConfig(
-        logger: const StderrLogger(level: LogLevel.debug),
-      );
-      final step1 = base.copyWith(loggingEnabled: false);
-      final step2 = step1.copyWith(loggingEnabled: true);
-      final step3 = step2.copyWith(loggingEnabled: false);
+      'multiple toggle: disable → enable → disable retains correct flag each step',
+      () {
+        final base = AgentsCoreConfig(
+          logger: const StderrLogger(level: LogLevel.debug),
+        );
+        final step1 = base.copyWith(loggingEnabled: false);
+        final step2 = step1.copyWith(loggingEnabled: true);
+        final step3 = step2.copyWith(loggingEnabled: false);
 
-      expect(step1.loggingEnabled, isFalse);
-      expect(step2.loggingEnabled, isTrue);
-      expect(step3.loggingEnabled, isFalse);
-    });
+        expect(step1.loggingEnabled, isFalse);
+        expect(step2.loggingEnabled, isTrue);
+        expect(step3.loggingEnabled, isFalse);
+      },
+    );
   });
 
   // ------------------------------------------------------------------ //
   // 4. Edge cases — toggling at runtime                                 //
   // ------------------------------------------------------------------ //
   group('global log control — edge cases', () {
-    test('toggling between two configs produces correct interleaved output', () {
-      final enabled = AgentsCoreConfig(
-        loggingEnabled: true,
-        logger: const StderrLogger(level: LogLevel.debug),
-      );
-      final disabled = AgentsCoreConfig(
-        loggingEnabled: false,
-        logger: const StderrLogger(level: LogLevel.debug),
-      );
+    test(
+      'toggling between two configs produces correct interleaved output',
+      () {
+        final enabled = AgentsCoreConfig(
+          loggingEnabled: true,
+          logger: const StderrLogger(level: LogLevel.debug),
+        );
+        final disabled = AgentsCoreConfig(
+          loggingEnabled: false,
+          logger: const StderrLogger(level: LogLevel.debug),
+        );
 
-      final out = captureStderr(() {
-        enabled.logger.info('message-A');
-        disabled.logger.info('message-B'); // should NOT appear
-        enabled.logger.info('message-C');
-      });
+        final out = captureStderr(() {
+          enabled.logger.info('message-A');
+          disabled.logger.info('message-B'); // should NOT appear
+          enabled.logger.info('message-C');
+        });
 
-      expect(out, contains('message-A'));
-      expect(out, isNot(contains('message-B')));
-      expect(out, contains('message-C'));
-    });
+        expect(out, contains('message-A'));
+        expect(out, isNot(contains('message-B')));
+        expect(out, contains('message-C'));
+      },
+    );
 
     test('disabled config: no output across 20 rapid successive calls', () {
       final config = AgentsCoreConfig(loggingEnabled: false);
@@ -352,8 +357,7 @@ void main() {
         loggingEnabled: true,
         logger: const SilentLogger(),
       );
-      final out =
-          captureStderr(() => config.logger.info('still-silent'));
+      final out = captureStderr(() => config.logger.info('still-silent'));
       expect(out, isEmpty);
     });
 
@@ -362,8 +366,7 @@ void main() {
         loggingEnabled: false,
         logger: const SilentLogger(),
       );
-      final out =
-          captureStderr(() => config.logger.error('definitely-silent'));
+      final out = captureStderr(() => config.logger.error('definitely-silent'));
       expect(out, isEmpty);
     });
 
@@ -372,12 +375,12 @@ void main() {
       const original = StderrLogger(level: LogLevel.debug);
       final config = AgentsCoreConfig(loggingEnabled: false, logger: original);
       // Direct call to the original logger still emits.
-      final outFromOriginal =
-          captureStderr(() => original.info('direct-call'));
+      final outFromOriginal = captureStderr(() => original.info('direct-call'));
       expect(outFromOriginal, contains('direct-call'));
       // Through config.logger the gate suppresses it.
-      final outFromConfig =
-          captureStderr(() => config.logger.info('config-call'));
+      final outFromConfig = captureStderr(
+        () => config.logger.info('config-call'),
+      );
       expect(outFromConfig, isEmpty);
     });
 
@@ -406,50 +409,54 @@ void main() {
     });
 
     test(
-        "fromEnvironment with AGENTS_LOGGING_ENABLED='false' disables logging",
-        () {
-      final config = AgentsCoreConfig.fromEnvironment(
-        environment: {'AGENTS_LOGGING_ENABLED': 'false'},
-      );
-      expect(config.loggingEnabled, isFalse);
-    });
-
-    test("fromEnvironment with AGENTS_LOGGING_ENABLED='true' enables logging",
-        () {
-      final config = AgentsCoreConfig.fromEnvironment(
-        environment: {'AGENTS_LOGGING_ENABLED': 'true'},
-      );
-      expect(config.loggingEnabled, isTrue);
-    });
+      "fromEnvironment with AGENTS_LOGGING_ENABLED='false' disables logging",
+      () {
+        final config = AgentsCoreConfig.fromEnvironment(
+          environment: {'AGENTS_LOGGING_ENABLED': 'false'},
+        );
+        expect(config.loggingEnabled, isFalse);
+      },
+    );
 
     test(
-        "fromEnvironment with AGENTS_LOGGING_ENABLED='FALSE' (uppercase) disables logging",
-        () {
-      final config = AgentsCoreConfig.fromEnvironment(
-        environment: {'AGENTS_LOGGING_ENABLED': 'FALSE'},
-      );
-      expect(config.loggingEnabled, isFalse);
-    });
+      "fromEnvironment with AGENTS_LOGGING_ENABLED='true' enables logging",
+      () {
+        final config = AgentsCoreConfig.fromEnvironment(
+          environment: {'AGENTS_LOGGING_ENABLED': 'true'},
+        );
+        expect(config.loggingEnabled, isTrue);
+      },
+    );
 
-    test("fromEnvironment with AGENTS_LOGGING_ENABLED='0' disables logging",
-        () {
-      final config = AgentsCoreConfig.fromEnvironment(
-        environment: {'AGENTS_LOGGING_ENABLED': '0'},
-      );
-      expect(config.loggingEnabled, isFalse);
-    });
+    test(
+      "fromEnvironment with AGENTS_LOGGING_ENABLED='FALSE' (uppercase) disables logging",
+      () {
+        final config = AgentsCoreConfig.fromEnvironment(
+          environment: {'AGENTS_LOGGING_ENABLED': 'FALSE'},
+        );
+        expect(config.loggingEnabled, isFalse);
+      },
+    );
+
+    test(
+      "fromEnvironment with AGENTS_LOGGING_ENABLED='0' disables logging",
+      () {
+        final config = AgentsCoreConfig.fromEnvironment(
+          environment: {'AGENTS_LOGGING_ENABLED': '0'},
+        );
+        expect(config.loggingEnabled, isFalse);
+      },
+    );
 
     test('fromEnvironment disabled via env var: logger produces no output', () {
       final config = AgentsCoreConfig.fromEnvironment(
         environment: {'AGENTS_LOGGING_ENABLED': 'false'},
       );
-      final out =
-          captureStderr(() => config.logger.info('env-suppressed'));
+      final out = captureStderr(() => config.logger.info('env-suppressed'));
       expect(out, isEmpty);
     });
 
-    test(
-        'fromEnvironment enabled via env var: logger produces output', () {
+    test('fromEnvironment enabled via env var: logger produces output', () {
       final config = AgentsCoreConfig.fromEnvironment(
         environment: {'AGENTS_LOGGING_ENABLED': 'true'},
         logger: const StderrLogger(level: LogLevel.debug),
@@ -459,34 +466,37 @@ void main() {
     });
 
     test(
-        'fromEnvironment without AGENTS_LOGGING_ENABLED: loggingEnabled defaults to true',
-        () {
-      final config = AgentsCoreConfig.fromEnvironment(
-        environment: {'AGENTS_DEFAULT_MODEL': 'some-model'},
-      );
-      expect(config.loggingEnabled, isTrue);
-    });
+      'fromEnvironment without AGENTS_LOGGING_ENABLED: loggingEnabled defaults to true',
+      () {
+        final config = AgentsCoreConfig.fromEnvironment(
+          environment: {'AGENTS_DEFAULT_MODEL': 'some-model'},
+        );
+        expect(config.loggingEnabled, isTrue);
+      },
+    );
 
     test(
-        'explicit loggingEnabled parameter overrides env var (param=true, var=false)',
-        () {
-      // Explicit parameter wins over the environment variable.
-      final config = AgentsCoreConfig.fromEnvironment(
-        environment: {'AGENTS_LOGGING_ENABLED': 'false'},
-        loggingEnabled: true,
-      );
-      expect(config.loggingEnabled, isTrue);
-    });
+      'explicit loggingEnabled parameter overrides env var (param=true, var=false)',
+      () {
+        // Explicit parameter wins over the environment variable.
+        final config = AgentsCoreConfig.fromEnvironment(
+          environment: {'AGENTS_LOGGING_ENABLED': 'false'},
+          loggingEnabled: true,
+        );
+        expect(config.loggingEnabled, isTrue);
+      },
+    );
 
     test(
-        'explicit loggingEnabled parameter overrides env var (param=false, var=true)',
-        () {
-      final config = AgentsCoreConfig.fromEnvironment(
-        environment: {'AGENTS_LOGGING_ENABLED': 'true'},
-        loggingEnabled: false,
-      );
-      expect(config.loggingEnabled, isFalse);
-    });
+      'explicit loggingEnabled parameter overrides env var (param=false, var=true)',
+      () {
+        final config = AgentsCoreConfig.fromEnvironment(
+          environment: {'AGENTS_LOGGING_ENABLED': 'true'},
+          loggingEnabled: false,
+        );
+        expect(config.loggingEnabled, isFalse);
+      },
+    );
   });
 
   // ------------------------------------------------------------------ //
@@ -505,19 +515,23 @@ void main() {
       expect(copy.loggingEnabled, isTrue);
     });
 
-    test('copyWith without loggingEnabled retains original value (enabled)',
-        () {
-      final config = AgentsCoreConfig(loggingEnabled: true);
-      final copy = config.copyWith(defaultModel: 'new-model');
-      expect(copy.loggingEnabled, isTrue);
-    });
+    test(
+      'copyWith without loggingEnabled retains original value (enabled)',
+      () {
+        final config = AgentsCoreConfig(loggingEnabled: true);
+        final copy = config.copyWith(defaultModel: 'new-model');
+        expect(copy.loggingEnabled, isTrue);
+      },
+    );
 
-    test('copyWith without loggingEnabled retains original value (disabled)',
-        () {
-      final config = AgentsCoreConfig(loggingEnabled: false);
-      final copy = config.copyWith(defaultModel: 'new-model');
-      expect(copy.loggingEnabled, isFalse);
-    });
+    test(
+      'copyWith without loggingEnabled retains original value (disabled)',
+      () {
+        final config = AgentsCoreConfig(loggingEnabled: false);
+        final copy = config.copyWith(defaultModel: 'new-model');
+        expect(copy.loggingEnabled, isFalse);
+      },
+    );
 
     test('copyWith(loggingEnabled: false) suppresses logger output', () {
       final enabled = AgentsCoreConfig(
@@ -539,37 +553,41 @@ void main() {
       expect(out, contains('now-active'));
     });
 
-    test('chained copyWith: disable → enable → disable accumulates correctly',
-        () {
-      final base = AgentsCoreConfig(loggingEnabled: false);
-      final step1 = base.copyWith(loggingEnabled: true);
-      final step2 = step1.copyWith(loggingEnabled: false);
-      final step3 = step2.copyWith(loggingEnabled: true);
-      expect(step1.loggingEnabled, isTrue);
-      expect(step2.loggingEnabled, isFalse);
-      expect(step3.loggingEnabled, isTrue);
-    });
+    test(
+      'chained copyWith: disable → enable → disable accumulates correctly',
+      () {
+        final base = AgentsCoreConfig(loggingEnabled: false);
+        final step1 = base.copyWith(loggingEnabled: true);
+        final step2 = step1.copyWith(loggingEnabled: false);
+        final step3 = step2.copyWith(loggingEnabled: true);
+        expect(step1.loggingEnabled, isTrue);
+        expect(step2.loggingEnabled, isFalse);
+        expect(step3.loggingEnabled, isTrue);
+      },
+    );
 
-    test('copyWith preserves all other fields when only loggingEnabled changes',
-        () {
-      final config = AgentsCoreConfig(
-        lmStudioBaseUrl: Uri.parse('http://10.0.0.1:4321'),
-        defaultModel: 'keep-model',
-        requestTimeout: const Duration(seconds: 30),
-        dockerImage: 'python:3.11',
-        workspacePath: '/keep/path',
-        apiKey: 'keep-key',
-        loggingEnabled: true,
-      );
-      final copy = config.copyWith(loggingEnabled: false);
-      expect(copy.lmStudioBaseUrl, equals(Uri.parse('http://10.0.0.1:4321')));
-      expect(copy.defaultModel, equals('keep-model'));
-      expect(copy.requestTimeout, equals(const Duration(seconds: 30)));
-      expect(copy.dockerImage, equals('python:3.11'));
-      expect(copy.workspacePath, equals('/keep/path'));
-      expect(copy.apiKey, equals('keep-key'));
-      expect(copy.loggingEnabled, isFalse);
-    });
+    test(
+      'copyWith preserves all other fields when only loggingEnabled changes',
+      () {
+        final config = AgentsCoreConfig(
+          lmStudioBaseUrl: Uri.parse('http://10.0.0.1:4321'),
+          defaultModel: 'keep-model',
+          requestTimeout: const Duration(seconds: 30),
+          dockerImage: 'python:3.11',
+          workspacePath: '/keep/path',
+          apiKey: 'keep-key',
+          loggingEnabled: true,
+        );
+        final copy = config.copyWith(loggingEnabled: false);
+        expect(copy.lmStudioBaseUrl, equals(Uri.parse('http://10.0.0.1:4321')));
+        expect(copy.defaultModel, equals('keep-model'));
+        expect(copy.requestTimeout, equals(const Duration(seconds: 30)));
+        expect(copy.dockerImage, equals('python:3.11'));
+        expect(copy.workspacePath, equals('/keep/path'));
+        expect(copy.apiKey, equals('keep-key'));
+        expect(copy.loggingEnabled, isFalse);
+      },
+    );
   });
 
   // ------------------------------------------------------------------ //
@@ -589,12 +607,14 @@ void main() {
       expect(a, isNot(equals(b)));
     });
 
-    test('default config (loggingEnabled=true) equals explicit true config',
-        () {
-      final a = AgentsCoreConfig();
-      final b = AgentsCoreConfig(loggingEnabled: true);
-      expect(a, equals(b));
-    });
+    test(
+      'default config (loggingEnabled=true) equals explicit true config',
+      () {
+        final a = AgentsCoreConfig();
+        final b = AgentsCoreConfig(loggingEnabled: true);
+        expect(a, equals(b));
+      },
+    );
 
     // hashCode
     test('enabled and disabled configs produce different hashCodes', () {
@@ -644,53 +664,55 @@ void main() {
       final config = AgentsCoreConfig(
         logger: const StderrLogger(level: LogLevel.debug),
       );
-      final out =
-          captureStderr(() => config.logger.info('backward-compat'));
+      final out = captureStderr(() => config.logger.info('backward-compat'));
       expect(out, contains('backward-compat'));
     });
 
     test(
-        'SilentLogger config stays silent regardless of loggingEnabled=true',
-        () {
-      final config = AgentsCoreConfig(
-        loggingEnabled: true,
-        logger: const SilentLogger(),
-      );
-      final out =
-          captureStderr(() => config.logger.info('should-be-silent'));
-      expect(out, isEmpty);
-    });
-
-    test('all original constructor fields still accepted alongside loggingEnabled',
-        () {
-      final config = AgentsCoreConfig(
-        lmStudioBaseUrl: Uri.parse('http://localhost:1234'),
-        defaultModel: 'my-model',
-        requestTimeout: const Duration(seconds: 60),
-        dockerImage: 'python:3.12-slim',
-        workspacePath: '/tmp/workspace',
-        apiKey: 'my-key',
-        logger: const SilentLogger(),
-        loggingEnabled: false,
-      );
-      expect(config.loggingEnabled, isFalse);
-      expect(config.apiKey, equals('my-key'));
-      expect(config.defaultModel, equals('my-model'));
-    });
+      'SilentLogger config stays silent regardless of loggingEnabled=true',
+      () {
+        final config = AgentsCoreConfig(
+          loggingEnabled: true,
+          logger: const SilentLogger(),
+        );
+        final out = captureStderr(() => config.logger.info('should-be-silent'));
+        expect(out, isEmpty);
+      },
+    );
 
     test(
-        'fromEnvironment without AGENTS_LOGGING_ENABLED still reads all other vars',
-        () {
-      final config = AgentsCoreConfig.fromEnvironment(
-        environment: {
-          'AGENTS_DEFAULT_MODEL': 'compat-model',
-          'AGENTS_WORKSPACE_PATH': '/compat/path',
-        },
-      );
-      expect(config.loggingEnabled, isTrue);
-      expect(config.defaultModel, equals('compat-model'));
-      expect(config.workspacePath, equals('/compat/path'));
-    });
+      'all original constructor fields still accepted alongside loggingEnabled',
+      () {
+        final config = AgentsCoreConfig(
+          lmStudioBaseUrl: Uri.parse('http://localhost:1234'),
+          defaultModel: 'my-model',
+          requestTimeout: const Duration(seconds: 60),
+          dockerImage: 'python:3.12-slim',
+          workspacePath: '/tmp/workspace',
+          apiKey: 'my-key',
+          logger: const SilentLogger(),
+          loggingEnabled: false,
+        );
+        expect(config.loggingEnabled, isFalse);
+        expect(config.apiKey, equals('my-key'));
+        expect(config.defaultModel, equals('my-model'));
+      },
+    );
+
+    test(
+      'fromEnvironment without AGENTS_LOGGING_ENABLED still reads all other vars',
+      () {
+        final config = AgentsCoreConfig.fromEnvironment(
+          environment: {
+            'AGENTS_DEFAULT_MODEL': 'compat-model',
+            'AGENTS_WORKSPACE_PATH': '/compat/path',
+          },
+        );
+        expect(config.loggingEnabled, isTrue);
+        expect(config.defaultModel, equals('compat-model'));
+        expect(config.workspacePath, equals('/compat/path'));
+      },
+    );
 
     test('existing copyWith calls without loggingEnabled continue to work', () {
       final config = AgentsCoreConfig(defaultModel: 'old-model');

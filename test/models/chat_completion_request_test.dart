@@ -3,14 +3,19 @@ import 'package:test/test.dart';
 
 void main() {
   final userMsg = ChatMessage(role: ChatMessageRole.user, content: 'Hello');
-  final systemMsg = ChatMessage(role: ChatMessageRole.system, content: 'You are helpful.');
+  final systemMsg = ChatMessage(
+    role: ChatMessageRole.system,
+    content: 'You are helpful.',
+  );
 
   final sampleTool = ToolDefinition(
     name: 'get_weather',
     description: 'Get weather',
     parameters: <String, dynamic>{
       'type': 'object',
-      'properties': {'city': <String, dynamic>{'type': 'string'}},
+      'properties': {
+        'city': <String, dynamic>{'type': 'string'},
+      },
     },
   );
 
@@ -75,7 +80,10 @@ void main() {
       final req = ChatCompletionRequest(
         model: 'model',
         messages: [userMsg],
-        toolChoice: {'type': 'function', 'function': {'name': 'get_weather'}},
+        toolChoice: {
+          'type': 'function',
+          'function': {'name': 'get_weather'},
+        },
       );
       expect(req.toolChoice, isA<Map>());
     });

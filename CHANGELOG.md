@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.6 — 2026-04-17
+
+- No new features, just a refactor in the whole package to apply SOLID and 
+Clean Code best practices.
+
 ## 0.3.5 — 2026-03-28
 
 ### Features

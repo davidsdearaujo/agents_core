@@ -54,7 +54,8 @@ Future<void> main() async {
       client: client,
       config: config,
       model: 'llama-3-8b',
-      systemPrompt: 'You are a software architect. '
+      systemPrompt:
+          'You are a software architect. '
           'Produce concise, structured specifications for Dart data '
           'structures. Include: class name, generic type parameter, '
           'public API methods with signatures, edge-case notes, and '
@@ -69,7 +70,8 @@ Future<void> main() async {
       client: client,
       config: config,
       model: 'llama-3-8b',
-      systemPrompt: 'You are a senior Dart developer. '
+      systemPrompt:
+          'You are a senior Dart developer. '
           'Implement clean, idiomatic Dart code with doc comments. '
           'Always save your implementation to "solution.dart" in the '
           'workspace using the write_file tool. '
@@ -85,7 +87,8 @@ Future<void> main() async {
       client: client,
       config: config,
       model: 'llama-3-8b',
-      systemPrompt: 'You are a strict Dart code reviewer. '
+      systemPrompt:
+          'You are a strict Dart code reviewer. '
           'Evaluate the code for correctness, edge-case handling, '
           'documentation, and idiomatic style. '
           'If the code meets all criteria, begin your response with '
@@ -98,7 +101,8 @@ Future<void> main() async {
       client: client,
       config: config,
       model: 'llama-3-8b',
-      systemPrompt: 'You are a technical writer specialising in Dart API '
+      systemPrompt:
+          'You are a technical writer specialising in Dart API '
           'documentation. Write clear, concise API docs with usage examples. '
           'Use Dart doc-comment style (///).',
     );
@@ -111,7 +115,8 @@ Future<void> main() async {
         // Step 1: Researcher generates a specification (static prompt).
         AgentStep(
           agent: researcher,
-          taskPrompt: 'Create a specification for a generic Stack<T> data '
+          taskPrompt:
+              'Create a specification for a generic Stack<T> data '
               'structure in Dart. It should support: push, pop, peek, '
               'isEmpty, size, clear, and toList. '
               'Include edge-case notes for pop/peek on empty stack.',
@@ -124,12 +129,12 @@ Future<void> main() async {
           producer: developer,
           reviewer: qa,
           isAccepted: (AgentResult reviewerResult, int iteration) {
-            return reviewerResult.output
-                .trim()
-                .toUpperCase()
-                .startsWith('APPROVED');
+            return reviewerResult.output.trim().toUpperCase().startsWith(
+              'APPROVED',
+            );
           },
-          taskPrompt: 'Implement a generic Stack<T> class in Dart with the '
+          taskPrompt:
+              'Implement a generic Stack<T> class in Dart with the '
               'following methods: push(T), T pop(), T peek(), bool isEmpty, '
               'int size, void clear(), List<T> toList(). '
               'Throw StateError on pop/peek when empty. '
@@ -201,10 +206,14 @@ Future<void> main() async {
 
           print('');
           print('  Iteration ${iteration.index}:');
-          print('    Producer (${iteration.producerResult.tokensUsed} tokens): '
-              '$producerPreview');
-          print('    Reviewer (${iteration.reviewerResult.tokensUsed} tokens): '
-              '$reviewerPreview');
+          print(
+            '    Producer (${iteration.producerResult.tokensUsed} tokens): '
+            '$producerPreview',
+          );
+          print(
+            '    Reviewer (${iteration.reviewerResult.tokensUsed} tokens): '
+            '$reviewerPreview',
+          );
         }
         print('');
       }
@@ -224,8 +233,10 @@ Future<void> main() async {
     }
 
     // Total tokens across all steps.
-    final totalTokens =
-        result.stepResults.fold<int>(0, (sum, r) => sum + r.tokensUsed);
+    final totalTokens = result.stepResults.fold<int>(
+      0,
+      (sum, r) => sum + r.tokensUsed,
+    );
     print('Total tokens:  $totalTokens');
 
     // ── Workspace files ──────────────────────────────────────────────────

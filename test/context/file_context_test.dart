@@ -32,8 +32,11 @@ void main() {
           if (d.existsSync()) d.deleteSync(recursive: true);
         });
 
-        expect(Directory(path).existsSync(), isFalse,
-            reason: 'pre-condition: directory should not exist');
+        expect(
+          Directory(path).existsSync(),
+          isFalse,
+          reason: 'pre-condition: directory should not exist',
+        );
         FileContext(workspacePath: path);
         expect(Directory(path).existsSync(), isTrue);
       });
@@ -76,7 +79,10 @@ void main() {
 
       test('creates a file with the given content', () {
         ctx.write('hello.txt', 'world');
-        expect(File('${dir.path}/hello.txt').readAsStringSync(), equals('world'));
+        expect(
+          File('${dir.path}/hello.txt').readAsStringSync(),
+          equals('world'),
+        );
       });
 
       test('file exists after write', () {
@@ -134,46 +140,53 @@ void main() {
       });
 
       test(
-          'nested traversal "a/../../escape.txt" does NOT create file outside workspace',
-          () {
-        try {
-          ctx.write('a/../../escape.txt', 'bad');
-        } catch (_) {}
-        // The file should not exist one level above the workspace
-        expect(File('${dir.parent.path}/escape.txt').existsSync(), isFalse);
-      });
+        'nested traversal "a/../../escape.txt" does NOT create file outside workspace',
+        () {
+          try {
+            ctx.write('a/../../escape.txt', 'bad');
+          } catch (_) {}
+          // The file should not exist one level above the workspace
+          expect(File('${dir.parent.path}/escape.txt').existsSync(), isFalse);
+        },
+      );
 
       test(
-          'throws PathTraversalException for deeply nested traversal "a/b/../../../"',
-          () {
-        expect(
-          () => ctx.write('a/b/../../../escape.txt', 'bad'),
-          throwsA(isA<PathTraversalException>()),
-        );
-      });
+        'throws PathTraversalException for deeply nested traversal "a/b/../../../"',
+        () {
+          expect(
+            () => ctx.write('a/b/../../../escape.txt', 'bad'),
+            throwsA(isA<PathTraversalException>()),
+          );
+        },
+      );
 
       test(
-          'throws PathTraversalException for dot-slash with traversal "./../../"',
-          () {
-        expect(
-          () => ctx.write('./../../escape.txt', 'bad'),
-          throwsA(isA<PathTraversalException>()),
-        );
-      });
+        'throws PathTraversalException for dot-slash with traversal "./../../"',
+        () {
+          expect(
+            () => ctx.write('./../../escape.txt', 'bad'),
+            throwsA(isA<PathTraversalException>()),
+          );
+        },
+      );
 
       test(
-          'throws PathTraversalException for consecutive double-dots "../../"',
-          () {
-        expect(
-          () => ctx.write('../../escape.txt', 'bad'),
-          throwsA(isA<PathTraversalException>()),
-        );
-      });
+        'throws PathTraversalException for consecutive double-dots "../../"',
+        () {
+          expect(
+            () => ctx.write('../../escape.txt', 'bad'),
+            throwsA(isA<PathTraversalException>()),
+          );
+        },
+      );
 
       test('allows legitimate subdirectory paths without traversal', () {
         // These should NOT throw — they stay inside the workspace
         expect(() => ctx.write('a/b/c.txt', 'ok'), returnsNormally);
-        expect(() => ctx.write('deep/nested/dir/file.txt', 'ok'), returnsNormally);
+        expect(
+          () => ctx.write('deep/nested/dir/file.txt', 'ok'),
+          returnsNormally,
+        );
       });
 
       // ───────────────────────────────────────────────────────────────────────
@@ -184,8 +197,11 @@ void main() {
         test('simple filename writes to workspace root', () {
           ctx.write('research_outline.md', '# Research');
           final file = File('${dir.path}/research_outline.md');
-          expect(file.existsSync(), isTrue,
-              reason: 'simple filename should land in workspace root');
+          expect(
+            file.existsSync(),
+            isTrue,
+            reason: 'simple filename should land in workspace root',
+          );
           expect(file.readAsStringSync(), equals('# Research'));
         });
 
@@ -242,18 +258,27 @@ void main() {
           ];
           for (final name in filenames) {
             ctx.write(name, 'content of $name');
-            expect(ctx.exists(name), isTrue,
-                reason: '"$name" should exist after write');
-            expect(ctx.read(name), equals('content of $name'),
-                reason: '"$name" should round-trip correctly');
+            expect(
+              ctx.exists(name),
+              isTrue,
+              reason: '"$name" should exist after write',
+            );
+            expect(
+              ctx.read(name),
+              equals('content of $name'),
+              reason: '"$name" should round-trip correctly',
+            );
           }
         });
 
         test('dot-slash prefix resolves to workspace root', () {
           // './file.txt' should be treated the same as 'file.txt'
           ctx.write('./report.md', 'report content');
-          expect(ctx.exists('report.md'), isTrue,
-              reason: '"./report.md" should resolve to "report.md" in root');
+          expect(
+            ctx.exists('report.md'),
+            isTrue,
+            reason: '"./report.md" should resolve to "report.md" in root',
+          );
         });
       });
 
@@ -268,23 +293,29 @@ void main() {
           expect(ctx.read('/etc/passwd'), equals('sandboxed'));
         });
 
-        test('absolute path does NOT write to the real filesystem location', () {
-          ctx.write('/tmp/agents_core_abs_test_canary.txt', 'sandboxed');
-          // The real /tmp file must not be created — only workspace-relative
-          expect(
-            File('/tmp/agents_core_abs_test_canary.txt').existsSync(),
-            isFalse,
-            reason: 'absolute path must not create file outside workspace',
-          );
-          // Clean up workspace-relative file
-          ctx.delete('/tmp/agents_core_abs_test_canary.txt');
-        });
+        test(
+          'absolute path does NOT write to the real filesystem location',
+          () {
+            ctx.write('/tmp/agents_core_abs_test_canary.txt', 'sandboxed');
+            // The real /tmp file must not be created — only workspace-relative
+            expect(
+              File('/tmp/agents_core_abs_test_canary.txt').existsSync(),
+              isFalse,
+              reason: 'absolute path must not create file outside workspace',
+            );
+            // Clean up workspace-relative file
+            ctx.delete('/tmp/agents_core_abs_test_canary.txt');
+          },
+        );
 
         test('absolute path file appears in listFiles()', () {
           ctx.write('/docs/notes.md', 'content');
           final files = ctx.listFiles();
-          expect(files.any((f) => f.contains('notes.md')), isTrue,
-              reason: 'file from absolute path should appear in listing');
+          expect(
+            files.any((f) => f.contains('notes.md')),
+            isTrue,
+            reason: 'file from absolute path should appear in listing',
+          );
         });
       });
     });
@@ -351,13 +382,14 @@ void main() {
       });
 
       test(
-          'throws PathTraversalException for nested traversal "a/../../secret.txt"',
-          () {
-        expect(
-          () => ctx.read('a/../../secret.txt'),
-          throwsA(isA<PathTraversalException>()),
-        );
-      });
+        'throws PathTraversalException for nested traversal "a/../../secret.txt"',
+        () {
+          expect(
+            () => ctx.read('a/../../secret.txt'),
+            throwsA(isA<PathTraversalException>()),
+          );
+        },
+      );
 
       test('can read file in subdirectory', () {
         ctx.write('sub/deep.txt', 'nested');
@@ -403,13 +435,14 @@ void main() {
       });
 
       test(
-          'throws PathTraversalException for nested traversal "a/../../etc/passwd"',
-          () {
-        expect(
-          () => ctx.exists('a/../../etc/passwd'),
-          throwsA(isA<PathTraversalException>()),
-        );
-      });
+        'throws PathTraversalException for nested traversal "a/../../etc/passwd"',
+        () {
+          expect(
+            () => ctx.exists('a/../../etc/passwd'),
+            throwsA(isA<PathTraversalException>()),
+          );
+        },
+      );
 
       test('returns true for file in subdirectory', () {
         ctx.write('sub/file.txt', 'x');
@@ -442,13 +475,15 @@ void main() {
         expect(ctx.listFiles(), containsAll(['a.txt', 'b.txt']));
       });
 
-      test('returned paths are relative to workspace root (no leading slash)',
-          () {
-        ctx.write('file.txt', 'x');
-        final files = ctx.listFiles();
-        expect(files, contains('file.txt'));
-        expect(files.every((f) => !f.startsWith('/')), isTrue);
-      });
+      test(
+        'returned paths are relative to workspace root (no leading slash)',
+        () {
+          ctx.write('file.txt', 'x');
+          final files = ctx.listFiles();
+          expect(files, contains('file.txt'));
+          expect(files.every((f) => !f.startsWith('/')), isTrue);
+        },
+      );
 
       test('excludes directories from listing', () {
         ctx.write('subdir/file.txt', 'x');
@@ -572,13 +607,14 @@ void main() {
       });
 
       test(
-          'throws PathTraversalException for nested traversal "a/../../bad.txt"',
-          () {
-        expect(
-          () => ctx.append('a/../../bad.txt', 'x'),
-          throwsA(isA<PathTraversalException>()),
-        );
-      });
+        'throws PathTraversalException for nested traversal "a/../../bad.txt"',
+        () {
+          expect(
+            () => ctx.append('a/../../bad.txt', 'x'),
+            throwsA(isA<PathTraversalException>()),
+          );
+        },
+      );
 
       test('nested traversal does NOT create file outside workspace', () {
         try {
@@ -639,13 +675,14 @@ void main() {
       });
 
       test(
-          'throws PathTraversalException for nested traversal "a/../../escape.txt"',
-          () {
-        expect(
-          () => ctx.delete('a/../../escape.txt'),
-          throwsA(isA<PathTraversalException>()),
-        );
-      });
+        'throws PathTraversalException for nested traversal "a/../../escape.txt"',
+        () {
+          expect(
+            () => ctx.delete('a/../../escape.txt'),
+            throwsA(isA<PathTraversalException>()),
+          );
+        },
+      );
 
       test('reading a deleted file throws FileNotFoundException', () {
         ctx.write('file.txt', 'data');
@@ -828,8 +865,7 @@ void main() {
       });
 
       test('allows deeply nested valid path', () {
-        expect(
-            () => ctx.write('a/b/c/d/e/file.txt', 'ok'), returnsNormally);
+        expect(() => ctx.write('a/b/c/d/e/file.txt', 'ok'), returnsNormally);
       });
     });
   });

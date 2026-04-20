@@ -33,8 +33,7 @@ import '../exceptions/sse_exceptions.dart';
 ///   print(obj['choices']);
 /// }
 /// ```
-class SseParser
-    implements StreamTransformer<String, Map<String, dynamic>> {
+class SseParser implements StreamTransformer<String, Map<String, dynamic>> {
   /// Creates a const [SseParser].
   const SseParser();
 

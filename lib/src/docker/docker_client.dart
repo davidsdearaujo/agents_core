@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../config/logger.dart';
+import '../config/logging_config.dart';
 import '../exceptions/docker_exceptions.dart';
 
 /// The result of running a command inside a Docker container.
@@ -66,12 +67,19 @@ class DockerClient {
   /// [dockerPath] is the path to the `docker` CLI executable. Defaults to
   /// `'docker'` which relies on `PATH` resolution.
   ///
-  /// [logger] is used for diagnostic output. When `null`, a [SilentLogger]
-  /// is used.
+  /// [loggingConfig] is the preferred way to supply a logger when using the
+  /// specialised config API. [loggingConfig.effectiveLogger] is used, which
+  /// respects the [LoggingConfig.loggingEnabled] gate automatically.
+  ///
+  /// [logger] is a legacy parameter for direct [Logger] injection. When
+  /// [loggingConfig] is also provided, [loggingConfig] takes precedence.
+  /// When both are omitted, a [SilentLogger] is used.
   DockerClient({
     this.dockerPath = 'docker',
+    LoggingConfig? loggingConfig,
     Logger? logger,
-  }) : _logger = logger ?? const SilentLogger();
+  }) : _logger =
+           loggingConfig?.effectiveLogger ?? logger ?? const SilentLogger();
 
   /// Path to the `docker` CLI executable.
   final String dockerPath;
@@ -119,11 +127,7 @@ class DockerClient {
   }) async {
     _logger.debug('Docker: running $image with command: $command');
 
-    final args = <String>[
-      'run',
-      '--rm',
-      '--network=none',
-    ];
+    final args = <String>['run', '--rm', '--network=none'];
 
     // Volume mounts.
     for (final entry in volumes.entries) {
@@ -148,15 +152,12 @@ class DockerClient {
 
     Process process;
     try {
-      process = await Process.start(
-        dockerPath,
-        args,
-        runInShell: false,
-      );
+      process = await Process.start(dockerPath, args, runInShell: false);
     } on ProcessException catch (e) {
       // docker CLI not found or not executable.
       throw DockerNotAvailableException(
-        message: 'Could not execute "$dockerPath". '
+        message:
+            'Could not execute "$dockerPath". '
             'Is Docker installed and in PATH?',
         cause: e,
       );
@@ -170,10 +171,12 @@ class DockerClient {
     // Collect stdout and stderr while the process runs.
     final stdoutBuffer = StringBuffer();
     final stderrBuffer = StringBuffer();
-    final stdoutDone =
-        process.stdout.transform(utf8.decoder).forEach(stdoutBuffer.write);
-    final stderrDone =
-        process.stderr.transform(utf8.decoder).forEach(stderrBuffer.write);
+    final stdoutDone = process.stdout
+        .transform(utf8.decoder)
+        .forEach(stdoutBuffer.write);
+    final stderrDone = process.stderr
+        .transform(utf8.decoder)
+        .forEach(stderrBuffer.write);
 
     bool didTimeout = false;
     int exitCode;
@@ -183,15 +186,16 @@ class DockerClient {
     } on TimeoutException {
       // Timeout exceeded — kill the container process to avoid orphans.
       didTimeout = true;
-      _logger.debug('Docker: timeout exceeded (${timeout.inSeconds}s), '
-          'killing process');
+      _logger.debug(
+        'Docker: timeout exceeded (${timeout.inSeconds}s), '
+        'killing process',
+      );
       process.kill(ProcessSignal.sigterm);
 
       // Give the process a moment to exit after SIGTERM, then force-kill
       // if it hasn't stopped.
       try {
-        exitCode = await process.exitCode
-            .timeout(const Duration(seconds: 5));
+        exitCode = await process.exitCode.timeout(const Duration(seconds: 5));
       } on TimeoutException {
         process.kill(ProcessSignal.sigkill);
         exitCode = await process.exitCode;
@@ -204,14 +208,17 @@ class DockerClient {
     final stdout = stdoutBuffer.toString().trimRight();
     final stderr = stderrBuffer.toString().trimRight();
 
-    _logger.debug('Docker: exitCode=$exitCode, '
-        'stdout=${stdout.length} chars, '
-        'stderr=${stderr.length} chars'
-        '${didTimeout ? ' (timed out)' : ''}');
+    _logger.debug(
+      'Docker: exitCode=$exitCode, '
+      'stdout=${stdout.length} chars, '
+      'stderr=${stderr.length} chars'
+      '${didTimeout ? ' (timed out)' : ''}',
+    );
 
     if (didTimeout) {
       throw DockerExecutionException(
-        message: 'Container exceeded timeout of ${timeout.inSeconds}s '
+        message:
+            'Container exceeded timeout of ${timeout.inSeconds}s '
             'and was killed. Image: $image',
         exitCode: exitCode,
         stderr: stderr,
@@ -226,18 +233,15 @@ class DockerClient {
     // application-level and returned to the caller.
     if (exitCode == 125) {
       throw DockerExecutionException(
-        message: 'Docker failed to create or start the container. '
+        message:
+            'Docker failed to create or start the container. '
             'Image: $image',
         exitCode: exitCode,
         stderr: stderr,
       );
     }
 
-    return DockerRunResult(
-      stdout: stdout,
-      stderr: stderr,
-      exitCode: exitCode,
-    );
+    return DockerRunResult(stdout: stdout, stderr: stderr, exitCode: exitCode);
   }
 
   /// Checks whether the Docker daemon is available and responsive.
@@ -267,10 +271,7 @@ class DockerClient {
   Future<bool> isImageAvailable(String image) async {
     _logger.debug('Docker: checking if image "$image" is available locally');
     try {
-      final result = await Process.run(
-        dockerPath,
-        ['image', 'inspect', image],
-      );
+      final result = await Process.run(dockerPath, ['image', 'inspect', image]);
       return result.exitCode == 0;
     } on ProcessException {
       return false;
@@ -301,7 +302,8 @@ class DockerClient {
       _logger.info('Docker: image "$image" pulled successfully');
     } on ProcessException catch (e) {
       throw DockerNotAvailableException(
-        message: 'Could not execute "$dockerPath pull $image". '
+        message:
+            'Could not execute "$dockerPath pull $image". '
             'Is Docker installed and in PATH?',
         cause: e,
       );

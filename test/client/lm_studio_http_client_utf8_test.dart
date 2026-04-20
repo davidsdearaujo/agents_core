@@ -34,37 +34,33 @@ import '../helpers/mock_lm_studio_server.dart';
 
 /// Creates an [AgentsCoreConfig] pointing at [server].
 AgentsCoreConfig _cfg(MockLmStudioServer server) => AgentsCoreConfig(
-      lmStudioBaseUrl: Uri.parse(server.baseUrl),
-      logger: const SilentLogger(),
-    );
+  lmStudioBaseUrl: Uri.parse(server.baseUrl),
+  logger: const SilentLogger(),
+);
 
 /// A standard chat-completion JSON response to enqueue for POST stubs.
 Map<String, dynamic> _chatResponse() => {
-      'id': 'chatcmpl-utf8-test',
-      'object': 'chat.completion',
-      'created': 1677858242,
-      'model': 'test-model',
-      'usage': {
-        'prompt_tokens': 10,
-        'completion_tokens': 5,
-        'total_tokens': 15,
-      },
-      'choices': [
-        {
-          'message': {'role': 'assistant', 'content': 'OK'},
-          'finish_reason': 'stop',
-          'index': 0,
-        },
-      ],
-    };
+  'id': 'chatcmpl-utf8-test',
+  'object': 'chat.completion',
+  'created': 1677858242,
+  'model': 'test-model',
+  'usage': {'prompt_tokens': 10, 'completion_tokens': 5, 'total_tokens': 15},
+  'choices': [
+    {
+      'message': {'role': 'assistant', 'content': 'OK'},
+      'finish_reason': 'stop',
+      'index': 0,
+    },
+  ],
+};
 
 /// Builds a chat-completion request body with the given [content].
 Map<String, dynamic> _chatBody(String content) => {
-      'model': 'test-model',
-      'messages': [
-        {'role': 'user', 'content': content},
-      ],
-    };
+  'model': 'test-model',
+  'messages': [
+    {'role': 'user', 'content': content},
+  ],
+};
 
 /// Extracts the user-message content from the recorded request body.
 String _extractContent(RecordedRequest req) {
@@ -208,8 +204,7 @@ void main() {
     });
 
     test('transmits mixed ASCII and non-ASCII in the same message', () async {
-      const content =
-          'User prompt with mixed: Hello 你好 こんにちは 🚀 café Привет';
+      const content = 'User prompt with mixed: Hello 你好 こんにちは 🚀 café Привет';
       server.enqueue(
         method: 'POST',
         path: '/v1/chat/completions',
@@ -282,8 +277,8 @@ void main() {
       await client.post('/v1/chat/completions', body);
 
       expect(server.requests, hasLength(1));
-      final recorded = json.decode(server.requests.first.body)
-          as Map<String, dynamic>;
+      final recorded =
+          json.decode(server.requests.first.body) as Map<String, dynamic>;
       final messages = recorded['messages'] as List;
       final systemMsg = messages.first as Map<String, dynamic>;
       expect(systemMsg['content'], equals(systemPrompt));
@@ -344,15 +339,17 @@ void main() {
       server.enqueue(
         method: 'POST',
         path: '/v1/chat/completions',
-        response: MockResponse.sse(chunks: [
-          {
-            'choices': [
-              {
-                'delta': {'content': 'OK'},
-              },
-            ],
-          },
-        ]),
+        response: MockResponse.sse(
+          chunks: [
+            {
+              'choices': [
+                {
+                  'delta': {'content': 'OK'},
+                },
+              ],
+            },
+          ],
+        ),
       );
 
       final client = LmStudioHttpClient(config: _cfg(server));
@@ -372,15 +369,17 @@ void main() {
       server.enqueue(
         method: 'POST',
         path: '/v1/chat/completions',
-        response: MockResponse.sse(chunks: [
-          {
-            'choices': [
-              {
-                'delta': {'content': 'OK'},
-              },
-            ],
-          },
-        ]),
+        response: MockResponse.sse(
+          chunks: [
+            {
+              'choices': [
+                {
+                  'delta': {'content': 'OK'},
+                },
+              ],
+            },
+          ],
+        ),
       );
 
       final client = LmStudioHttpClient(config: _cfg(server));
@@ -399,15 +398,17 @@ void main() {
       server.enqueue(
         method: 'POST',
         path: '/v1/chat/completions',
-        response: MockResponse.sse(chunks: [
-          {
-            'choices': [
-              {
-                'delta': {'content': 'OK'},
-              },
-            ],
-          },
-        ]),
+        response: MockResponse.sse(
+          chunks: [
+            {
+              'choices': [
+                {
+                  'delta': {'content': 'OK'},
+                },
+              ],
+            },
+          ],
+        ),
       );
 
       final client = LmStudioHttpClient(config: _cfg(server));
@@ -427,15 +428,17 @@ void main() {
       server.enqueue(
         method: 'POST',
         path: '/v1/chat/completions',
-        response: MockResponse.sse(chunks: [
-          {
-            'choices': [
-              {
-                'delta': {'content': 'Réponse'},
-              },
-            ],
-          },
-        ]),
+        response: MockResponse.sse(
+          chunks: [
+            {
+              'choices': [
+                {
+                  'delta': {'content': 'Réponse'},
+                },
+              ],
+            },
+          ],
+        ),
       );
 
       final client = LmStudioHttpClient(config: _cfg(server));
@@ -449,14 +452,13 @@ void main() {
       expect(_extractContent(server.requests.first), equals(content));
     });
 
-    test(
-      'transmits non-ASCII system prompt correctly via streaming',
-      () async {
-        const systemPrompt = '你是一个中文助手。请用中文回答所有问题。';
-        server.enqueue(
-          method: 'POST',
-          path: '/v1/chat/completions',
-          response: MockResponse.sse(chunks: [
+    test('transmits non-ASCII system prompt correctly via streaming', () async {
+      const systemPrompt = '你是一个中文助手。请用中文回答所有问题。';
+      server.enqueue(
+        method: 'POST',
+        path: '/v1/chat/completions',
+        response: MockResponse.sse(
+          chunks: [
             {
               'choices': [
                 {
@@ -464,36 +466,33 @@ void main() {
                 },
               ],
             },
-          ]),
-        );
-
-        final client = LmStudioHttpClient(config: _cfg(server));
-        addTearDown(client.dispose);
-
-        final body = {
-          'model': 'test-model',
-          'messages': [
-            {'role': 'system', 'content': systemPrompt},
-            {'role': 'user', 'content': '你好'},
           ],
-        };
+        ),
+      );
 
-        await client.postStream('/v1/chat/completions', body).toList();
+      final client = LmStudioHttpClient(config: _cfg(server));
+      addTearDown(client.dispose);
 
-        expect(server.requests, hasLength(1));
-        final recorded = json.decode(server.requests.first.body)
-            as Map<String, dynamic>;
-        final messages = recorded['messages'] as List;
-        expect(
-          (messages[0] as Map<String, dynamic>)['content'],
-          equals(systemPrompt),
-        );
-        expect(
-          (messages[1] as Map<String, dynamic>)['content'],
-          equals('你好'),
-        );
-      },
-    );
+      final body = {
+        'model': 'test-model',
+        'messages': [
+          {'role': 'system', 'content': systemPrompt},
+          {'role': 'user', 'content': '你好'},
+        ],
+      };
+
+      await client.postStream('/v1/chat/completions', body).toList();
+
+      expect(server.requests, hasLength(1));
+      final recorded =
+          json.decode(server.requests.first.body) as Map<String, dynamic>;
+      final messages = recorded['messages'] as List;
+      expect(
+        (messages[0] as Map<String, dynamic>)['content'],
+        equals(systemPrompt),
+      );
+      expect((messages[1] as Map<String, dynamic>)['content'], equals('你好'));
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -593,39 +592,36 @@ void main() {
   // Group 4: Multiple sequential non-ASCII requests
   // ---------------------------------------------------------------------------
   group('LmStudioHttpClient — sequential UTF-8 requests', () {
-    test('multiple POST requests with different scripts all arrive intact',
-        () async {
-      final contents = [
-        '你好世界',
-        'Привет мир',
-        '🚀 Launch 🎯',
-        'café résumé',
-      ];
+    test(
+      'multiple POST requests with different scripts all arrive intact',
+      () async {
+        final contents = ['你好世界', 'Привет мир', '🚀 Launch 🎯', 'café résumé'];
 
-      for (final _ in contents) {
-        server.enqueue(
-          method: 'POST',
-          path: '/v1/chat/completions',
-          response: MockResponse.json(body: _chatResponse()),
-        );
-      }
+        for (final _ in contents) {
+          server.enqueue(
+            method: 'POST',
+            path: '/v1/chat/completions',
+            response: MockResponse.json(body: _chatResponse()),
+          );
+        }
 
-      final client = LmStudioHttpClient(config: _cfg(server));
-      addTearDown(client.dispose);
+        final client = LmStudioHttpClient(config: _cfg(server));
+        addTearDown(client.dispose);
 
-      for (final content in contents) {
-        await client.post('/v1/chat/completions', _chatBody(content));
-      }
+        for (final content in contents) {
+          await client.post('/v1/chat/completions', _chatBody(content));
+        }
 
-      expect(server.requests, hasLength(4));
-      for (var i = 0; i < contents.length; i++) {
-        expect(
-          _extractContent(server.requests[i]),
-          equals(contents[i]),
-          reason: 'Request $i should have content: ${contents[i]}',
-        );
-      }
-    });
+        expect(server.requests, hasLength(4));
+        for (var i = 0; i < contents.length; i++) {
+          expect(
+            _extractContent(server.requests[i]),
+            equals(contents[i]),
+            reason: 'Request $i should have content: ${contents[i]}',
+          );
+        }
+      },
+    );
 
     test('mixed POST and postStream with non-ASCII content', () async {
       const postContent = '中文 POST request';
@@ -642,15 +638,17 @@ void main() {
       server.enqueue(
         method: 'POST',
         path: '/v1/chat/completions',
-        response: MockResponse.sse(chunks: [
-          {
-            'choices': [
-              {
-                'delta': {'content': 'OK'},
-              },
-            ],
-          },
-        ]),
+        response: MockResponse.sse(
+          chunks: [
+            {
+              'choices': [
+                {
+                  'delta': {'content': 'OK'},
+                },
+              ],
+            },
+          ],
+        ),
       );
 
       final client = LmStudioHttpClient(config: _cfg(server));

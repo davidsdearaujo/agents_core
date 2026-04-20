@@ -18,9 +18,7 @@ import 'dart:io';
 import 'package:agents_core/agents_core.dart';
 
 Future<void> main() async {
-  final config = AgentsCoreConfig(
-    logger: const SilentLogger(),
-  );
+  final config = AgentsCoreConfig(logger: const SilentLogger());
 
   final client = LmStudioClient(config);
   const model = 'llama-3-8b';
@@ -29,7 +27,8 @@ Future<void> main() async {
   final history = <ChatMessage>[
     ChatMessage(
       role: ChatMessageRole.system,
-      content: 'You are a helpful history tutor. '
+      content:
+          'You are a helpful history tutor. '
           'Keep answers concise (1-2 sentences). '
           'Reference prior questions when relevant.',
     ),
@@ -74,8 +73,9 @@ Future<void> main() async {
     for (final msg in history) {
       final role = msg.role.value.toUpperCase().padRight(10);
       final content = msg.content ?? '(no content)';
-      final preview =
-          content.length > 70 ? '${content.substring(0, 70)}...' : content;
+      final preview = content.length > 70
+          ? '${content.substring(0, 70)}...'
+          : content;
       print('  $role $preview');
     }
   } on LmStudioConnectionException catch (e) {
@@ -90,7 +90,7 @@ Future<void> main() async {
 /// Sends a user message, appends both user and assistant messages to
 /// [history], and returns the assistant's reply text.
 Future<String> _sendMessage({
-  required LmStudioClient client,
+  required LlmClient client,
   required String model,
   required List<ChatMessage> history,
   required String userMessage,
@@ -99,10 +99,7 @@ Future<String> _sendMessage({
   history.add(ChatMessage(role: ChatMessageRole.user, content: userMessage));
 
   // Send the full history to the model.
-  final request = ChatCompletionRequest(
-    model: model,
-    messages: history,
-  );
+  final request = ChatCompletionRequest(model: model, messages: history);
 
   final response = await client.chatCompletion(request);
   final assistantMessage = response.choices.first.message;

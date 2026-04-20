@@ -38,8 +38,7 @@ class MockResponse {
   factory MockResponse.json({
     int statusCode = 200,
     required Map<String, dynamic> body,
-  }) =>
-      MockResponse._(statusCode: statusCode, jsonBody: body);
+  }) => MockResponse._(statusCode: statusCode, jsonBody: body);
 
   /// Creates an SSE (Server-Sent Events) streaming response.
   ///
@@ -47,17 +46,14 @@ class MockResponse {
   /// event line. A terminal `data: [DONE]` event is appended automatically.
   ///
   /// The response status is always 200 for SSE.
-  factory MockResponse.sse({
-    required List<Map<String, dynamic>> chunks,
-  }) =>
+  factory MockResponse.sse({required List<Map<String, dynamic>> chunks}) =>
       MockResponse._(statusCode: HttpStatus.ok, sseChunks: chunks);
 
   /// Creates an error (non-2xx) JSON response.
   factory MockResponse.error({
     required int statusCode,
     required Map<String, dynamic> body,
-  }) =>
-      MockResponse._(statusCode: statusCode, jsonBody: body);
+  }) => MockResponse._(statusCode: statusCode, jsonBody: body);
 
   /// The HTTP status code to return.
   final int statusCode;
@@ -223,8 +219,7 @@ class MockLmStudioServer {
   /// Calling code is responsible for invoking [close] when the server is no
   /// longer needed (typically in a `tearDown` block).
   static Future<MockLmStudioServer> start() async {
-    final server =
-        await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     return MockLmStudioServer._(server);
   }
 
@@ -236,11 +231,7 @@ class MockLmStudioServer {
   ///
   /// Stubs are matched in FIFO order — the first enqueued stub whose
   /// [method] and [path] match the incoming request is consumed.
-  void enqueue({
-    String? method,
-    String? path,
-    required MockResponse response,
-  }) {
+  void enqueue({String? method, String? path, required MockResponse response}) {
     _stubs.add(_Stub(method: method, path: path, response: response));
   }
 
@@ -267,16 +258,19 @@ class MockLmStudioServer {
     final headers = <String, List<String>>{};
     request.headers.forEach((name, values) => headers[name] = List.of(values));
 
-    _requests.add(RecordedRequest(
-      method: request.method,
-      path: request.uri.path,
-      body: body,
-      headers: headers,
-    ));
+    _requests.add(
+      RecordedRequest(
+        method: request.method,
+        path: request.uri.path,
+        body: body,
+        headers: headers,
+      ),
+    );
 
     // Find the first matching stub (FIFO).
-    final stubIndex = _stubs
-        .indexWhere((s) => s.matches(request.method, request.uri.path));
+    final stubIndex = _stubs.indexWhere(
+      (s) => s.matches(request.method, request.uri.path),
+    );
 
     if (stubIndex == -1) {
       // No matching stub — fail fast with a descriptive 500 so tests break
@@ -285,11 +279,13 @@ class MockLmStudioServer {
       request.response
         ..statusCode = HttpStatus.internalServerError
         ..headers.contentType = ContentType.json
-        ..write(jsonEncode({
-          'error':
-              'MockLmStudioServer: no stub registered for '
-              '${request.method} ${request.uri.path}',
-        }));
+        ..write(
+          jsonEncode({
+            'error':
+                'MockLmStudioServer: no stub registered for '
+                '${request.method} ${request.uri.path}',
+          }),
+        );
       await request.response.close();
       return;
     }

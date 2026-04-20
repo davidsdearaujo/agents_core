@@ -6,8 +6,9 @@ import 'package:test/test.dart';
 // ---------------------------------------------------------------------------
 
 /// Builds a [ToolCall] with the given [name] and optional [arguments].
-ToolCall _tc(String name, {String arguments = '{}'}) =>
-    ToolCall(function: ToolCallFunction(name: name, arguments: arguments));
+ToolCall _tc(String name, {String arguments = '{}'}) => ToolCall(
+  function: ToolCallFunction(name: name, arguments: arguments),
+);
 
 /// Creates a [LoopDetector] with the given thresholds (defaults match
 /// [LoopDetectionConfig] defaults).
@@ -15,14 +16,13 @@ LoopDetector _detector({
   int toolThreshold = 3,
   int outputThreshold = 3,
   double similarity = 0.85,
-}) =>
-    LoopDetector(
-      config: LoopDetectionConfig(
-        maxConsecutiveIdenticalToolCalls: toolThreshold,
-        maxConsecutiveIdenticalOutputs: outputThreshold,
-        similarityThreshold: similarity,
-      ),
-    );
+}) => LoopDetector(
+  config: LoopDetectionConfig(
+    maxConsecutiveIdenticalToolCalls: toolThreshold,
+    maxConsecutiveIdenticalOutputs: outputThreshold,
+    similarityThreshold: similarity,
+  ),
+);
 
 void main() {
   // =========================================================================
@@ -86,52 +86,52 @@ void main() {
   });
 
   // =========================================================================
-  // bigramSimilarity — edge cases
+  // TextSimilarity.bigram — edge cases (used internally by LoopDetector)
   // =========================================================================
 
-  group('LoopDetector.bigramSimilarity — edge cases', () {
+  group('TextSimilarity.bigram — edge cases', () {
     test('identical strings return 1.0', () {
-      expect(LoopDetector.bigramSimilarity('hello', 'hello'), equals(1.0));
+      expect(TextSimilarity.bigram('hello', 'hello'), equals(1.0));
     });
 
     test('both empty strings return 1.0', () {
       // Empty == empty via fast path (a == b).
-      expect(LoopDetector.bigramSimilarity('', ''), equals(1.0));
+      expect(TextSimilarity.bigram('', ''), equals(1.0));
     });
 
     test('first string empty, second non-empty returns 0.0', () {
-      expect(LoopDetector.bigramSimilarity('', 'hello'), equals(0.0));
+      expect(TextSimilarity.bigram('', 'hello'), equals(0.0));
     });
 
     test('first string non-empty, second empty returns 0.0', () {
-      expect(LoopDetector.bigramSimilarity('hello', ''), equals(0.0));
+      expect(TextSimilarity.bigram('hello', ''), equals(0.0));
     });
 
     test('single-char equal strings return 1.0', () {
-      expect(LoopDetector.bigramSimilarity('a', 'a'), equals(1.0));
+      expect(TextSimilarity.bigram('a', 'a'), equals(1.0));
     });
 
     test('single-char different strings return 0.0', () {
-      expect(LoopDetector.bigramSimilarity('a', 'b'), equals(0.0));
+      expect(TextSimilarity.bigram('a', 'b'), equals(0.0));
     });
 
     test('two-char equal strings return 1.0', () {
-      expect(LoopDetector.bigramSimilarity('ab', 'ab'), equals(1.0));
+      expect(TextSimilarity.bigram('ab', 'ab'), equals(1.0));
     });
 
     test('two-char different strings return 0.0', () {
-      expect(LoopDetector.bigramSimilarity('ab', 'cd'), equals(0.0));
+      expect(TextSimilarity.bigram('ab', 'cd'), equals(0.0));
     });
   });
 
   // =========================================================================
-  // bigramSimilarity — bigram computation
+  // TextSimilarity.bigram — bigram computation
   // =========================================================================
 
-  group('LoopDetector.bigramSimilarity — bigram computation', () {
+  group('TextSimilarity.bigram — bigram computation', () {
     test('completely different words return 0.0', () {
       // 'hello' bigrams: he, el, ll, lo — no overlap with 'world': wo, or, rl, ld
-      expect(LoopDetector.bigramSimilarity('hello', 'world'), equals(0.0));
+      expect(TextSimilarity.bigram('hello', 'world'), equals(0.0));
     });
 
     test('known example: night / nacht returns ~0.25', () {
@@ -139,24 +139,19 @@ void main() {
       // 'nacht' bigrams: na, ac, ch, ht (4)
       // intersection: ht → 1
       // totalSize = 4 + 4 = 8 → 2/8 = 0.25
-      expect(
-        LoopDetector.bigramSimilarity('night', 'nacht'),
-        closeTo(0.25, 1e-9),
-      );
+      expect(TextSimilarity.bigram('night', 'nacht'), closeTo(0.25, 1e-9));
     });
 
     test('near-identical string (one extra char appended) returns ≥ 0.95', () {
       // 'hello world' (10 bigrams) vs 'hello world!' (11 bigrams)
       // all 10 of 'hello world' appear in 'hello world!'
       // similarity = 20/21 ≈ 0.952
-      final sim =
-          LoopDetector.bigramSimilarity('hello world', 'hello world!');
+      final sim = TextSimilarity.bigram('hello world', 'hello world!');
       expect(sim, greaterThanOrEqualTo(0.95));
     });
 
     test('near-identical string (one char prepended) returns ≥ 0.95', () {
-      final sim =
-          LoopDetector.bigramSimilarity('hello world', 'xhello world');
+      final sim = TextSimilarity.bigram('hello world', 'xhello world');
       expect(sim, greaterThanOrEqualTo(0.88));
     });
 
@@ -165,15 +160,12 @@ void main() {
       // intersection = min(2,1) = 1
       // totalSize = 2 + 1 = 3
       // similarity = 2/3 ≈ 0.667
-      expect(
-        LoopDetector.bigramSimilarity('aaa', 'aa'),
-        closeTo(2 / 3, 1e-9),
-      );
+      expect(TextSimilarity.bigram('aaa', 'aa'), closeTo(2 / 3, 1e-9));
     });
 
     test('string with whitespace difference has high similarity', () {
       // 'the quick fox' vs 'the  quick fox' (double space) — shares most bigrams
-      final sim = LoopDetector.bigramSimilarity(
+      final sim = TextSimilarity.bigram(
         'the quick brown fox',
         'the quick brown fox jumps',
       );
@@ -181,13 +173,10 @@ void main() {
       expect(sim, greaterThan(0.7));
     });
 
-    test('symmetry: bigramSimilarity(a,b) == bigramSimilarity(b,a)', () {
+    test('symmetry: bigram(a,b) == bigram(b,a)', () {
       expect(
-        LoopDetector.bigramSimilarity('apple', 'application'),
-        closeTo(
-          LoopDetector.bigramSimilarity('application', 'apple'),
-          1e-9,
-        ),
+        TextSimilarity.bigram('apple', 'application'),
+        closeTo(TextSimilarity.bigram('application', 'apple'), 1e-9),
       );
     });
 
@@ -201,9 +190,12 @@ void main() {
         ('night', 'nacht'),
       ];
       for (final (a, b) in pairs) {
-        final sim = LoopDetector.bigramSimilarity(a, b);
-        expect(sim, inInclusiveRange(0.0, 1.0),
-            reason: "bigramSimilarity('$a', '$b') = $sim is out of range");
+        final sim = TextSimilarity.bigram(a, b);
+        expect(
+          sim,
+          inInclusiveRange(0.0, 1.0),
+          reason: "bigram('$a', '$b') = $sim is out of range",
+        );
       }
     });
   });
@@ -230,8 +222,11 @@ void main() {
       detector.recordToolCalls([]);
       detector.recordToolCalls([]);
       final result = detector.check();
-      expect(result.isLooping, isFalse,
-          reason: 'empty fingerprints should not trigger loop detection');
+      expect(
+        result.isLooping,
+        isFalse,
+        reason: 'empty fingerprints should not trigger loop detection',
+      );
     });
 
     test('single tool call creates non-empty fingerprint', () {
@@ -522,7 +517,9 @@ void main() {
       final detector = _detector(outputThreshold: 3, similarity: 1.0);
       detector.recordOutput('hello world');
       detector.recordOutput('hello world!'); // not identical
-      detector.recordOutput('hello world'); // identical to first but not all same
+      detector.recordOutput(
+        'hello world',
+      ); // identical to first but not all same
       // 'hello world' vs 'hello world!': bigramSimilarity < 1.0 → no loop
       expect(detector.check().isLooping, isFalse);
     });
@@ -710,7 +707,9 @@ void main() {
 
       // Third identical tool call — loop detected on tool calls.
       detector.recordToolCalls([call]);
-      detector.recordOutput('Search result C'); // different output, no output loop
+      detector.recordOutput(
+        'Search result C',
+      ); // different output, no output loop
       expect(detector.check().isLooping, isTrue);
     });
 
@@ -735,8 +734,8 @@ void main() {
       // Simulate an LLM churning out near-duplicate responses.
       const base = 'I need to search for information about Dart programming.';
       detector.recordOutput(base);
-      detector.recordOutput('$base ');             // trailing space
-      detector.recordOutput('$base  ');            // two trailing spaces
+      detector.recordOutput('$base '); // trailing space
+      detector.recordOutput('$base  '); // two trailing spaces
 
       // All three are very similar; expect loop detection.
       final result = detector.check();

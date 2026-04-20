@@ -3,38 +3,50 @@
 import '../agent/agent.dart';
 import '../agent/agent_result.dart';
 import '../context/file_context.dart';
+import 'agent_loop.dart';
+import 'step_result.dart';
+import 'task_prompt.dart';
 
 /// Abstract base class for all steps in an [Orchestrator] pipeline.
 ///
 /// Each step carries a [taskPrompt] and an optional [condition] guard.
-/// Concrete subclasses define how the step is executed:
+/// Concrete subclasses define how the step is executed by implementing
+/// [execute]:
 ///
 /// - [AgentStep] — runs a single agent once.
 /// - [AgentLoopStep] — runs a produce-review loop between two agents.
 ///
-/// The [taskPrompt] is typed as [Object] to allow both:
-/// - A static [String] prompt, and
-/// - A `Future<String> Function(FileContext)` that resolves at runtime.
+/// The [taskPrompt] is a sealed [TaskPrompt] — either a [StaticPrompt]
+/// (compile-time string) or a [DynamicPrompt] (resolved at runtime).
 ///
 /// ```dart
 /// // Concrete subclasses satisfy the abstract getters:
 /// final step = AgentStep(agent: myAgent, taskPrompt: 'Summarise the report');
-/// print(step.taskPrompt); // 'Summarise the report'
 /// print(step.condition);  // null — step always runs
 /// ```
 abstract class OrchestratorStep {
   /// Const constructor for subclasses.
   const OrchestratorStep();
 
-  /// The task prompt — either a [String] or a
-  /// `Future<String> Function(FileContext)` that is awaited at runtime.
-  Object get taskPrompt;
+  /// The task prompt — either a [StaticPrompt] (compile-time string) or a
+  /// [DynamicPrompt] (resolved at runtime from the [FileContext]).
+  TaskPrompt get taskPrompt;
 
   /// An optional guard condition evaluated before the step runs.
   ///
   /// When `null`, the step always executes. When provided, the step is
   /// skipped if the function returns `false`.
   Future<bool> Function(FileContext)? get condition;
+
+  /// Executes the step with the given [context] and [resolvedPrompt].
+  ///
+  /// Called by [Orchestrator] after resolving the [taskPrompt]. The returned
+  /// [StepResult] is added to [OrchestratorResult.stepResults].
+  ///
+  /// Subclasses must implement this method to define their execution
+  /// behaviour. This design follows the Open/Closed Principle — [Orchestrator]
+  /// calls [execute] polymorphically without knowing the concrete step type.
+  Future<StepResult> execute(FileContext context, String resolvedPrompt);
 }
 
 /// An [OrchestratorStep] that runs a produce-review [AgentLoop].
@@ -96,7 +108,7 @@ class AgentLoopStep extends OrchestratorStep {
     this.buildProducerPrompt,
     this.buildReviewerPrompt,
     this.condition,
-  }) : taskPrompt = taskPrompt;
+  }) : taskPrompt = StaticPrompt(taskPrompt);
 
   /// Creates an [AgentLoopStep] with a dynamic task prompt that is resolved
   /// at runtime.
@@ -116,7 +128,7 @@ class AgentLoopStep extends OrchestratorStep {
     this.buildProducerPrompt,
     this.buildReviewerPrompt,
     this.condition,
-  }) : taskPrompt = taskPrompt;
+  }) : taskPrompt = DynamicPrompt(taskPrompt);
 
   /// The agent that produces work each iteration.
   final Agent producer;
@@ -146,7 +158,8 @@ class AgentLoopStep extends OrchestratorStep {
     FileContext context,
     int iteration,
     AgentResult? previousReviewerResult,
-  )? buildProducerPrompt;
+  )?
+  buildProducerPrompt;
 
   /// Optional custom prompt builder for the reviewer agent.
   ///
@@ -157,11 +170,29 @@ class AgentLoopStep extends OrchestratorStep {
     FileContext context,
     int iteration,
     AgentResult producerResult,
-  )? buildReviewerPrompt;
+  )?
+  buildReviewerPrompt;
 
   @override
-  final Object taskPrompt;
+  final TaskPrompt taskPrompt;
 
   @override
   final Future<bool> Function(FileContext)? condition;
+
+  /// Runs the produce-review [AgentLoop] with [resolvedPrompt] and wraps
+  /// the result in an [AgentLoopStepResult].
+  @override
+  Future<StepResult> execute(FileContext context, String resolvedPrompt) async {
+    final loop = AgentLoop(
+      context: context,
+      producer: producer,
+      reviewer: reviewer,
+      isAccepted: isAccepted,
+      maxIterations: maxIterations,
+      buildProducerPrompt: buildProducerPrompt,
+      buildReviewerPrompt: buildReviewerPrompt,
+    );
+    final result = await loop.run(resolvedPrompt);
+    return AgentLoopStepResult(agentLoopResult: result);
+  }
 }

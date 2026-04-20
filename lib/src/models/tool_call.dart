@@ -77,9 +77,7 @@ class ToolCall {
       id: json['id'] as String?,
       type: json['type'] as String?,
       function: json['function'] != null
-          ? ToolCallFunction.fromJson(
-              json['function'] as Map<String, dynamic>,
-            )
+          ? ToolCallFunction.fromJson(json['function'] as Map<String, dynamic>)
           : null,
       index: json['index'] as int?,
     );

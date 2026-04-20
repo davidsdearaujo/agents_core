@@ -1,5 +1,6 @@
 import '../agent/agent.dart';
 import '../agent/agent_result.dart';
+import '../agent/agent_stop_reason.dart';
 import '../context/file_context.dart';
 import '../loop_detection/loop_detection_config.dart';
 import '../loop_detection/loop_detector.dart';
@@ -57,8 +58,9 @@ class AgentLoopResult {
   /// [accepted] is `true` when the reviewer accepted the producer's output.
   /// [duration] is the wall-clock time of the entire loop.
   /// [totalTokensUsed] is the sum of all agent runs' `tokensUsed`.
-  /// [stoppedReason] indicates why the loop stopped (e.g. `"accepted"`,
-  /// `"max_iterations"`, `"loop_detected"`). Defaults to `null` for
+  /// [stoppedReason] indicates why the loop stopped (e.g.
+  /// [AgentStopReason.accepted], [AgentStopReason.maxIterations],
+  /// [AgentStopReason.loopDetected]). Defaults to `null` for
   /// backwards compatibility.
   const AgentLoopResult({
     required this.iterations,
@@ -86,12 +88,12 @@ class AgentLoopResult {
   /// The reason the loop stopped.
   ///
   /// Possible values:
-  /// - `"accepted"` — the reviewer accepted the producer's output.
-  /// - `"max_iterations"` — [AgentLoop.maxIterations] was reached.
-  /// - `"loop_detected"` — a repetitive output pattern was detected.
+  /// - [AgentStopReason.accepted] — the reviewer accepted the producer's output.
+  /// - [AgentStopReason.maxIterations] — [AgentLoop.maxIterations] was reached.
+  /// - [AgentStopReason.loopDetected] — a repetitive output pattern was detected.
   /// - `null` — not set (backwards compatibility with callers that
   ///   constructed results without this field).
-  final String? stoppedReason;
+  final AgentStopReason? stoppedReason;
 
   /// The number of iterations executed.
   int get iterationCount => iterations.length;
@@ -111,11 +113,12 @@ class AgentLoopResult {
   ///
   /// Returns `false` when the loop stopped due to loop detection — use
   /// [loopDetected] to check for that case.
-  bool get reachedMaxIterations => !accepted && stoppedReason != 'loop_detected';
+  bool get reachedMaxIterations =>
+      stoppedReason == AgentStopReason.maxIterations;
 
   /// Whether the loop ended because a repetitive output pattern was
   /// detected by the [LoopDetector].
-  bool get loopDetected => stoppedReason == 'loop_detected';
+  bool get loopDetected => stoppedReason == AgentStopReason.loopDetected;
 }
 
 /// Orchestrates a produce-review loop between two agents.
@@ -169,7 +172,7 @@ class AgentLoop {
   /// [loopDetectionConfig] enables automatic detection of repetitive
   /// producer outputs. When non-null, a [LoopDetector] tracks producer
   /// outputs each iteration and stops the loop with
-  /// `stoppedReason: "loop_detected"` if repetition is detected.
+  /// [AgentStopReason.loopDetected] if repetition is detected.
   const AgentLoop({
     required this.context,
     required this.producer,
@@ -212,7 +215,8 @@ class AgentLoop {
     FileContext context,
     int iteration,
     AgentResult? previousReviewerResult,
-  )? buildProducerPrompt;
+  )?
+  buildProducerPrompt;
 
   /// Optional custom prompt builder for the reviewer agent.
   ///
@@ -223,13 +227,14 @@ class AgentLoop {
     FileContext context,
     int iteration,
     AgentResult producerResult,
-  )? buildReviewerPrompt;
+  )?
+  buildReviewerPrompt;
 
   /// Optional configuration for automatic loop detection.
   ///
   /// When non-null, the loop tracks producer outputs and stops early with
-  /// [AgentLoopResult.stoppedReason] set to `"loop_detected"` if
-  /// repetitive patterns are found.
+  /// [AgentLoopResult.stoppedReason] set to [AgentStopReason.loopDetected]
+  /// if repetitive patterns are found.
   ///
   /// When `null` (the default), no loop detection is performed.
   final LoopDetectionConfig? loopDetectionConfig;
@@ -254,7 +259,7 @@ class AgentLoop {
     final iterations = <AgentLoopIteration>[];
     var accepted = false;
     var totalTokens = 0;
-    String? stoppedReason;
+    AgentStopReason? stoppedReason;
     AgentResult? previousReviewerResult;
 
     final detector = loopDetectionConfig != null
@@ -272,7 +277,11 @@ class AgentLoop {
           previousReviewerResult,
         );
       } else {
-        producerPrompt = _defaultProducerPrompt(task, i, previousReviewerResult);
+        producerPrompt = _defaultProducerPrompt(
+          task,
+          i,
+          previousReviewerResult,
+        );
       }
 
       // 2. Run producer.
@@ -303,18 +312,20 @@ class AgentLoop {
       totalTokens += reviewerResult.tokensUsed;
 
       // 5. Record iteration.
-      iterations.add(AgentLoopIteration(
-        index: i,
-        producerResult: producerResult,
-        reviewerResult: reviewerResult,
-      ));
+      iterations.add(
+        AgentLoopIteration(
+          index: i,
+          producerResult: producerResult,
+          reviewerResult: reviewerResult,
+        ),
+      );
 
       // 5.5. Check for repetitive loop in producer outputs.
       if (detector != null) {
         detector.recordOutput(producerResult.output);
         final loopCheck = detector.check();
         if (loopCheck.isLooping) {
-          stoppedReason = 'loop_detected';
+          stoppedReason = AgentStopReason.loopDetected;
           break;
         }
       }
@@ -322,7 +333,7 @@ class AgentLoop {
       // 6. Check acceptance.
       if (isAccepted(reviewerResult, i)) {
         accepted = true;
-        stoppedReason = 'accepted';
+        stoppedReason = AgentStopReason.accepted;
         break;
       }
 
@@ -330,7 +341,9 @@ class AgentLoop {
     }
 
     // If no explicit stop reason was set, the loop exhausted maxIterations.
-    stoppedReason ??= accepted ? 'accepted' : 'max_iterations';
+    stoppedReason ??= accepted
+        ? AgentStopReason.accepted
+        : AgentStopReason.maxIterations;
 
     stopwatch.stop();
 

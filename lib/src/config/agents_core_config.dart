@@ -1,6 +1,9 @@
 import 'dart:io' show Platform;
 
+import 'docker_config.dart';
 import 'logger.dart';
+import 'lm_studio_config.dart';
+import 'logging_config.dart';
 
 /// Top-level configuration for the agents_core library.
 ///
@@ -64,9 +67,8 @@ class AgentsCoreConfig {
     this.apiKey,
     this.loggingEnabled = true,
     Logger? logger,
-  })  : lmStudioBaseUrl =
-            lmStudioBaseUrl ?? Uri.parse('http://localhost:1234'),
-        _logger = logger ?? const StderrLogger();
+  }) : lmStudioBaseUrl = lmStudioBaseUrl ?? Uri.parse('http://localhost:1234'),
+       _logger = logger ?? const StderrLogger();
 
   /// Creates an [AgentsCoreConfig] from environment variables.
   ///
@@ -117,14 +119,47 @@ class AgentsCoreConfig {
 
     return AgentsCoreConfig(
       lmStudioBaseUrl: lmStudioBaseUrl,
-      defaultModel:
-          env['AGENTS_DEFAULT_MODEL'] ?? 'lmstudio-community/default',
+      defaultModel: env['AGENTS_DEFAULT_MODEL'] ?? 'lmstudio-community/default',
       requestTimeout: requestTimeout ?? const Duration(seconds: 60),
       dockerImage: env['AGENTS_DOCKER_IMAGE'] ?? 'python:3.12-slim',
       workspacePath: env['AGENTS_WORKSPACE_PATH'] ?? '/tmp/agents_workspace',
       apiKey: env['AGENTS_API_KEY'],
       loggingEnabled: resolvedLoggingEnabled,
       logger: logger,
+    );
+  }
+
+  /// Creates an [AgentsCoreConfig] from three focused sub-configs.
+  ///
+  /// This is the preferred constructor when building configuration from
+  /// specialised objects injected independently.
+  ///
+  /// All flat top-level fields ([lmStudioBaseUrl], [defaultModel],
+  /// [requestTimeout], [dockerImage], [workspacePath], [apiKey],
+  /// [loggingEnabled], and the internal logger) are populated from
+  /// the sub-config values, so all existing accessors continue to work.
+  ///
+  /// ```dart
+  /// final config = AgentsCoreConfig.fromConfigs(
+  ///   lmStudio: LmStudioConfig(baseUrl: Uri.parse('http://localhost:1234')),
+  ///   docker: DockerConfig(),
+  ///   logging: LoggingConfig(loggingEnabled: false),
+  /// );
+  /// ```
+  factory AgentsCoreConfig.fromConfigs({
+    required LmStudioConfig lmStudio,
+    required DockerConfig docker,
+    required LoggingConfig logging,
+  }) {
+    return AgentsCoreConfig(
+      lmStudioBaseUrl: lmStudio.baseUrl,
+      defaultModel: lmStudio.defaultModel,
+      requestTimeout: lmStudio.requestTimeout,
+      apiKey: lmStudio.apiKey,
+      dockerImage: docker.image,
+      workspacePath: docker.workspacePath,
+      loggingEnabled: logging.loggingEnabled,
+      logger: logging.logger,
     );
   }
 
@@ -200,6 +235,35 @@ class AgentsCoreConfig {
   /// applied transparently.
   Logger get logger => loggingEnabled ? _logger : const SilentLogger();
 
+  /// Returns an [LmStudioConfig] built from this configuration's LM Studio
+  /// fields.
+  ///
+  /// The returned sub-config reflects the current values of [lmStudioBaseUrl],
+  /// [defaultModel], [requestTimeout], and [apiKey]. It can be passed
+  /// directly to components that accept [LmStudioConfig].
+  LmStudioConfig get lmStudio => LmStudioConfig(
+    baseUrl: lmStudioBaseUrl,
+    defaultModel: defaultModel,
+    requestTimeout: requestTimeout,
+    apiKey: apiKey,
+  );
+
+  /// Returns a [DockerConfig] built from this configuration's Docker fields.
+  ///
+  /// The returned sub-config reflects the current values of [dockerImage]
+  /// and [workspacePath]. It can be passed directly to components that
+  /// accept [DockerConfig].
+  DockerConfig get docker =>
+      DockerConfig(image: dockerImage, workspacePath: workspacePath);
+
+  /// Returns a [LoggingConfig] built from this configuration's logging fields.
+  ///
+  /// The returned sub-config reflects the current values of [loggingEnabled]
+  /// and the internal logger instance. It can be passed directly to
+  /// components that accept [LoggingConfig].
+  LoggingConfig get logging =>
+      LoggingConfig(logger: _logger, loggingEnabled: loggingEnabled);
+
   /// Returns a new [AgentsCoreConfig] with the specified fields replaced.
   ///
   /// Fields that are not provided retain their original values.
@@ -244,14 +308,14 @@ class AgentsCoreConfig {
 
   @override
   int get hashCode => Object.hash(
-        lmStudioBaseUrl,
-        defaultModel,
-        requestTimeout,
-        dockerImage,
-        workspacePath,
-        apiKey,
-        loggingEnabled,
-      );
+    lmStudioBaseUrl,
+    defaultModel,
+    requestTimeout,
+    dockerImage,
+    workspacePath,
+    apiKey,
+    loggingEnabled,
+  );
 
   @override
   String toString() =>

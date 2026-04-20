@@ -5,8 +5,9 @@ void main() {
   group('DockerNotAvailableException', () {
     group('construction', () {
       test('can be instantiated with required message', () {
-        const exception =
-            DockerNotAvailableException(message: 'Docker not found');
+        const exception = DockerNotAvailableException(
+          message: 'Docker not found',
+        );
         expect(exception, isNotNull);
       });
 
@@ -22,8 +23,7 @@ void main() {
       });
 
       test('cause defaults to null when not provided', () {
-        const exception =
-            DockerNotAvailableException(message: 'no cause');
+        const exception = DockerNotAvailableException(message: 'no cause');
         expect(exception.cause, isNull);
       });
 
@@ -53,8 +53,7 @@ void main() {
 
     group('implements Exception', () {
       test('is an instance of Exception', () {
-        const exception =
-            DockerNotAvailableException(message: 'test');
+        const exception = DockerNotAvailableException(message: 'test');
         expect(exception, isA<Exception>());
       });
 
@@ -75,9 +74,7 @@ void main() {
       test('can be caught in a try/catch block', () {
         String? caughtMessage;
         try {
-          throw const DockerNotAvailableException(
-            message: 'daemon offline',
-          );
+          throw const DockerNotAvailableException(message: 'daemon offline');
         } on DockerNotAvailableException catch (e) {
           caughtMessage = e.message;
         }
@@ -87,8 +84,7 @@ void main() {
 
     group('toString()', () {
       test('includes the class name', () {
-        const exception =
-            DockerNotAvailableException(message: 'test');
+        const exception = DockerNotAvailableException(message: 'test');
         expect(exception.toString(), contains('DockerNotAvailableException'));
       });
 
@@ -99,8 +95,7 @@ void main() {
       });
 
       test('returns a non-empty string', () {
-        const exception =
-            DockerNotAvailableException(message: 'any');
+        const exception = DockerNotAvailableException(message: 'any');
         expect(exception.toString(), isNotEmpty);
       });
 
@@ -135,10 +130,7 @@ void main() {
 
       test('stores the provided message', () {
         const msg = 'Docker daemon error';
-        const exception = DockerExecutionException(
-          message: msg,
-          exitCode: 1,
-        );
+        const exception = DockerExecutionException(message: msg, exitCode: 1);
         expect(exception.message, equals(msg));
       });
 
@@ -169,10 +161,7 @@ void main() {
       });
 
       test('can be instantiated with an empty message', () {
-        const exception = DockerExecutionException(
-          message: '',
-          exitCode: 0,
-        );
+        const exception = DockerExecutionException(message: '', exitCode: 0);
         expect(exception.message, isEmpty);
       });
 
@@ -201,14 +190,8 @@ void main() {
       });
 
       test('can be const-constructed', () {
-        const e1 = DockerExecutionException(
-          message: 'const',
-          exitCode: 1,
-        );
-        const e2 = DockerExecutionException(
-          message: 'const',
-          exitCode: 1,
-        );
+        const e1 = DockerExecutionException(message: 'const', exitCode: 1);
+        const e2 = DockerExecutionException(message: 'const', exitCode: 1);
         expect(identical(e1, e2), isTrue);
       });
 
@@ -255,10 +238,7 @@ void main() {
       test('can be caught in a try/catch block', () {
         int? caughtExitCode;
         try {
-          throw const DockerExecutionException(
-            message: 'test',
-            exitCode: 125,
-          );
+          throw const DockerExecutionException(message: 'test', exitCode: 125);
         } on DockerExecutionException catch (e) {
           caughtExitCode = e.exitCode;
         }
@@ -277,10 +257,7 @@ void main() {
 
       test('includes the message', () {
         const msg = 'image pull failed';
-        const exception = DockerExecutionException(
-          message: msg,
-          exitCode: 1,
-        );
+        const exception = DockerExecutionException(message: msg, exitCode: 1);
         expect(exception.toString(), contains(msg));
       });
 
@@ -293,26 +270,25 @@ void main() {
       });
 
       test('returns a non-empty string', () {
-        const exception = DockerExecutionException(
-          message: 'any',
-          exitCode: 0,
-        );
+        const exception = DockerExecutionException(message: 'any', exitCode: 0);
         expect(exception.toString(), isNotEmpty);
       });
 
-      test('formats as "DockerExecutionException: <message> (exitCode=<n>)"',
-          () {
-        const msg = 'container creation failed';
-        const code = 125;
-        const exception = DockerExecutionException(
-          message: msg,
-          exitCode: code,
-        );
-        expect(
-          exception.toString(),
-          equals('DockerExecutionException: $msg (exitCode=$code)'),
-        );
-      });
+      test(
+        'formats as "DockerExecutionException: <message> (exitCode=<n>)"',
+        () {
+          const msg = 'container creation failed';
+          const code = 125;
+          const exception = DockerExecutionException(
+            message: msg,
+            exitCode: code,
+          );
+          expect(
+            exception.toString(),
+            equals('DockerExecutionException: $msg (exitCode=$code)'),
+          );
+        },
+      );
     });
 
     group('equality and identity', () {
@@ -333,26 +309,17 @@ void main() {
   });
 
   group('Docker exceptions hierarchy', () {
-    test(
-        'DockerNotAvailableException and DockerExecutionException '
+    test('DockerNotAvailableException and DockerExecutionException '
         'are independent types', () {
-      const notAvail =
-          DockerNotAvailableException(message: 'not running');
-      const execErr = DockerExecutionException(
-        message: 'failed',
-        exitCode: 1,
-      );
+      const notAvail = DockerNotAvailableException(message: 'not running');
+      const execErr = DockerExecutionException(message: 'failed', exitCode: 1);
       expect(notAvail, isNot(isA<DockerExecutionException>()));
       expect(execErr, isNot(isA<DockerNotAvailableException>()));
     });
 
     test('both implement Exception', () {
-      const notAvail =
-          DockerNotAvailableException(message: 'test');
-      const execErr = DockerExecutionException(
-        message: 'test',
-        exitCode: 1,
-      );
+      const notAvail = DockerNotAvailableException(message: 'test');
+      const execErr = DockerExecutionException(message: 'test', exitCode: 1);
       expect(notAvail, isA<Exception>());
       expect(execErr, isA<Exception>());
     });

@@ -33,7 +33,7 @@ class LmModel {
 
   /// Serializes this model to a JSON-compatible map with snake_case keys.
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'owned_by': ownedBy,
-      };
+    'id': id,
+    'owned_by': ownedBy,
+  };
 }

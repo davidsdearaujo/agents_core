@@ -285,20 +285,21 @@ void main() {
       });
 
       test(
-          'with level=info, debug is suppressed but info/warn/error are emitted',
-          () {
-        const logger = StderrLogger(level: LogLevel.info);
-        final out = captureStderr(() {
-          logger.debug('dbg-hidden');
-          logger.info('inf-visible');
-          logger.warn('wrn-visible');
-          logger.error('err-visible');
-        });
-        expect(out, isNot(contains('dbg-hidden')));
-        expect(out, contains('inf-visible'));
-        expect(out, contains('wrn-visible'));
-        expect(out, contains('err-visible'));
-      });
+        'with level=info, debug is suppressed but info/warn/error are emitted',
+        () {
+          const logger = StderrLogger(level: LogLevel.info);
+          final out = captureStderr(() {
+            logger.debug('dbg-hidden');
+            logger.info('inf-visible');
+            logger.warn('wrn-visible');
+            logger.error('err-visible');
+          });
+          expect(out, isNot(contains('dbg-hidden')));
+          expect(out, contains('inf-visible'));
+          expect(out, contains('wrn-visible'));
+          expect(out, contains('err-visible'));
+        },
+      );
     });
 
     group('output format', () {

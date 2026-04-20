@@ -39,8 +39,8 @@ class CompletionUsage {
 
   /// Serializes this usage to a JSON-compatible map with snake_case keys.
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'prompt_tokens': promptTokens,
-        'completion_tokens': completionTokens,
-        'total_tokens': totalTokens,
-      };
+    'prompt_tokens': promptTokens,
+    'completion_tokens': completionTokens,
+    'total_tokens': totalTokens,
+  };
 }

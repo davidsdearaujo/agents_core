@@ -69,20 +69,12 @@ void main() {
       });
 
       test('stores exitCode', () {
-        const result = DockerRunResult(
-          stdout: '',
-          stderr: '',
-          exitCode: 42,
-        );
+        const result = DockerRunResult(stdout: '', stderr: '', exitCode: 42);
         expect(result.exitCode, equals(42));
       });
 
       test('stores zero exitCode for success', () {
-        const result = DockerRunResult(
-          stdout: '',
-          stderr: '',
-          exitCode: 0,
-        );
+        const result = DockerRunResult(stdout: '', stderr: '', exitCode: 0);
         expect(result.exitCode, equals(0));
       });
 
@@ -96,11 +88,7 @@ void main() {
       });
 
       test('can hold empty strings for stdout and stderr', () {
-        const result = DockerRunResult(
-          stdout: '',
-          stderr: '',
-          exitCode: 0,
-        );
+        const result = DockerRunResult(stdout: '', stderr: '', exitCode: 0);
         expect(result.stdout, isEmpty);
         expect(result.stderr, isEmpty);
       });
@@ -136,16 +124,8 @@ void main() {
       });
 
       test('can be const-constructed', () {
-        const r1 = DockerRunResult(
-          stdout: 'a',
-          stderr: 'b',
-          exitCode: 0,
-        );
-        const r2 = DockerRunResult(
-          stdout: 'a',
-          stderr: 'b',
-          exitCode: 0,
-        );
+        const r1 = DockerRunResult(stdout: 'a', stderr: 'b', exitCode: 0);
+        const r2 = DockerRunResult(stdout: 'a', stderr: 'b', exitCode: 0);
         expect(identical(r1, r2), isTrue);
       });
 
@@ -177,11 +157,7 @@ void main() {
       });
 
       test('stores exit code 137 (killed / OOM)', () {
-        const result = DockerRunResult(
-          stdout: '',
-          stderr: '',
-          exitCode: 137,
-        );
+        const result = DockerRunResult(stdout: '', stderr: '', exitCode: 137);
         expect(result.exitCode, equals(137));
       });
     });
@@ -225,19 +201,19 @@ void main() {
     // DockerClient.isAvailable()
     // =========================================================================
     group('isAvailable()', () {
-      test('returns false when dockerPath points to a non-existent binary',
-          () async {
-        final client = DockerClient(
-          dockerPath: '/non/existent/path/to/docker_binary_xyz_000',
-        );
-        final available = await client.isAvailable();
-        expect(available, isFalse);
-      });
+      test(
+        'returns false when dockerPath points to a non-existent binary',
+        () async {
+          final client = DockerClient(
+            dockerPath: '/non/existent/path/to/docker_binary_xyz_000',
+          );
+          final available = await client.isAvailable();
+          expect(available, isFalse);
+        },
+      );
 
       test('returns a Future<bool>', () {
-        final client = DockerClient(
-          dockerPath: '/non/existent/docker_bin',
-        );
+        final client = DockerClient(dockerPath: '/non/existent/docker_bin');
         expect(client.isAvailable(), isA<Future<bool>>());
       });
     });
@@ -247,22 +223,14 @@ void main() {
     // =========================================================================
     group('isImageAvailable()', () {
       test('returns false when dockerPath is invalid', () async {
-        final client = DockerClient(
-          dockerPath: '/non/existent/docker_xyz_000',
-        );
-        final available =
-            await client.isImageAvailable('python:3.12-slim');
+        final client = DockerClient(dockerPath: '/non/existent/docker_xyz_000');
+        final available = await client.isImageAvailable('python:3.12-slim');
         expect(available, isFalse);
       });
 
       test('returns a Future<bool>', () {
-        final client = DockerClient(
-          dockerPath: '/non/existent/docker_bin',
-        );
-        expect(
-          client.isImageAvailable('any-image'),
-          isA<Future<bool>>(),
-        );
+        final client = DockerClient(dockerPath: '/non/existent/docker_bin');
+        expect(client.isImageAvailable('any-image'), isA<Future<bool>>());
       });
 
       test('logs debug message when checking image', () async {
@@ -286,59 +254,54 @@ void main() {
     // =========================================================================
     group('runContainer()', () {
       test(
-          'throws DockerNotAvailableException when docker binary does not exist',
-          () async {
-        final client = DockerClient(
-          dockerPath: '/non/existent/docker_xyz_000',
-        );
-        expect(
-          () => client.runContainer(
-            image: 'python:3.12-slim',
-            command: ['python', '-c', 'print("hello")'],
-          ),
-          throwsA(isA<DockerNotAvailableException>()),
-        );
-      });
+        'throws DockerNotAvailableException when docker binary does not exist',
+        () async {
+          final client = DockerClient(
+            dockerPath: '/non/existent/docker_xyz_000',
+          );
+          expect(
+            () => client.runContainer(
+              image: 'python:3.12-slim',
+              command: ['python', '-c', 'print("hello")'],
+            ),
+            throwsA(isA<DockerNotAvailableException>()),
+          );
+        },
+      );
 
       test(
-          'DockerNotAvailableException has descriptive message when docker not found',
-          () async {
-        final client = DockerClient(
-          dockerPath: '/non/existent/docker_xyz_000',
-        );
-        try {
-          await client.runContainer(
-            image: 'alpine',
-            command: ['echo', 'test'],
+        'DockerNotAvailableException has descriptive message when docker not found',
+        () async {
+          final client = DockerClient(
+            dockerPath: '/non/existent/docker_xyz_000',
           );
-          fail('Expected DockerNotAvailableException');
-        } on DockerNotAvailableException catch (e) {
-          expect(e.message, isNotEmpty);
-          expect(e.cause, isNotNull);
-        }
-      });
+          try {
+            await client.runContainer(
+              image: 'alpine',
+              command: ['echo', 'test'],
+            );
+            fail('Expected DockerNotAvailableException');
+          } on DockerNotAvailableException catch (e) {
+            expect(e.message, isNotEmpty);
+            expect(e.cause, isNotNull);
+          }
+        },
+      );
 
       test('default timeout is 60 seconds', () async {
         // We verify that the API accepts no timeout parameter
         // (the default Duration(seconds: 60) is used internally).
-        final client = DockerClient(
-          dockerPath: '/non/existent/docker_xyz_000',
-        );
+        final client = DockerClient(dockerPath: '/non/existent/docker_xyz_000');
         // This will throw DockerNotAvailableException, but it proves
         // the call signature works without specifying timeout.
         expect(
-          () => client.runContainer(
-            image: 'alpine',
-            command: ['echo', 'ok'],
-          ),
+          () => client.runContainer(image: 'alpine', command: ['echo', 'ok']),
           throwsA(isA<DockerNotAvailableException>()),
         );
       });
 
       test('accepts custom timeout', () async {
-        final client = DockerClient(
-          dockerPath: '/non/existent/docker_xyz_000',
-        );
+        final client = DockerClient(dockerPath: '/non/existent/docker_xyz_000');
         expect(
           () => client.runContainer(
             image: 'alpine',
@@ -350,9 +313,7 @@ void main() {
       });
 
       test('accepts volumes parameter', () async {
-        final client = DockerClient(
-          dockerPath: '/non/existent/docker_xyz_000',
-        );
+        final client = DockerClient(dockerPath: '/non/existent/docker_xyz_000');
         expect(
           () => client.runContainer(
             image: 'alpine',
@@ -364,9 +325,7 @@ void main() {
       });
 
       test('accepts workingDir parameter', () async {
-        final client = DockerClient(
-          dockerPath: '/non/existent/docker_xyz_000',
-        );
+        final client = DockerClient(dockerPath: '/non/existent/docker_xyz_000');
         expect(
           () => client.runContainer(
             image: 'alpine',
@@ -378,9 +337,7 @@ void main() {
       });
 
       test('accepts environment parameter', () async {
-        final client = DockerClient(
-          dockerPath: '/non/existent/docker_xyz_000',
-        );
+        final client = DockerClient(dockerPath: '/non/existent/docker_xyz_000');
         expect(
           () => client.runContainer(
             image: 'alpine',
@@ -407,26 +364,20 @@ void main() {
         }
         final debugMessages = logger.messagesAt(LogLevel.debug);
         expect(
-          debugMessages.any(
-            (m) => m.contains('python:3.12-slim'),
-          ),
+          debugMessages.any((m) => m.contains('python:3.12-slim')),
           isTrue,
           reason: 'Should log a debug message containing the image name',
         );
       });
 
       test('returns Future<DockerRunResult>', () async {
-        final dir =
-            await Directory.systemTemp.createTemp('docker_ret_type_');
+        final dir = await Directory.systemTemp.createTemp('docker_ret_type_');
         final stub = File('${dir.path}/docker');
         await stub.writeAsString('#!/bin/sh\nexit 0\n');
         await Process.run('chmod', ['+x', stub.path]);
 
         final client = DockerClient(dockerPath: stub.path);
-        final future = client.runContainer(
-          image: 'alpine',
-          command: ['echo'],
-        );
+        final future = client.runContainer(image: 'alpine', command: ['echo']);
         expect(future, isA<Future<DockerRunResult>>());
         final result = await future;
         expect(result, isA<DockerRunResult>());
@@ -505,10 +456,7 @@ void main() {
       test('throws DockerExecutionException on exit code 125', () async {
         final client = DockerClient(dockerPath: stubPath);
         expect(
-          () => client.runContainer(
-            image: 'bad-image',
-            command: ['echo'],
-          ),
+          () => client.runContainer(image: 'bad-image', command: ['echo']),
           throwsA(isA<DockerExecutionException>()),
         );
       });
@@ -516,10 +464,7 @@ void main() {
       test('DockerExecutionException on exit 125 has exitCode 125', () async {
         final client = DockerClient(dockerPath: stubPath);
         try {
-          await client.runContainer(
-            image: 'bad-image',
-            command: ['echo'],
-          );
+          await client.runContainer(image: 'bad-image', command: ['echo']);
           fail('Expected DockerExecutionException');
         } on DockerExecutionException catch (e) {
           expect(e.exitCode, equals(125));
@@ -529,30 +474,29 @@ void main() {
       test('DockerExecutionException on exit 125 has stderr', () async {
         final client = DockerClient(dockerPath: stubPath);
         try {
-          await client.runContainer(
-            image: 'bad-image',
-            command: ['echo'],
-          );
+          await client.runContainer(image: 'bad-image', command: ['echo']);
           fail('Expected DockerExecutionException');
         } on DockerExecutionException catch (e) {
           expect(e.stderr, contains('daemon error'));
         }
       });
 
-      test('DockerExecutionException on exit 125 has descriptive message',
-          () async {
-        final client = DockerClient(dockerPath: stubPath);
-        try {
-          await client.runContainer(
-            image: 'my-broken-image:latest',
-            command: ['echo'],
-          );
-          fail('Expected DockerExecutionException');
-        } on DockerExecutionException catch (e) {
-          expect(e.message, isNotEmpty);
-          expect(e.message, contains('my-broken-image:latest'));
-        }
-      });
+      test(
+        'DockerExecutionException on exit 125 has descriptive message',
+        () async {
+          final client = DockerClient(dockerPath: stubPath);
+          try {
+            await client.runContainer(
+              image: 'my-broken-image:latest',
+              command: ['echo'],
+            );
+            fail('Expected DockerExecutionException');
+          } on DockerExecutionException catch (e) {
+            expect(e.message, isNotEmpty);
+            expect(e.message, contains('my-broken-image:latest'));
+          }
+        },
+      );
     });
 
     group('runContainer() with non-125 non-zero exit code stub', () {
@@ -572,20 +516,21 @@ void main() {
       });
 
       test(
-          'returns DockerRunResult (not exception) for non-125 non-zero exit codes',
-          () async {
-        final client = DockerClient(dockerPath: stubPath);
-        // Non-125 exits represent application-level errors inside the
-        // container and should be returned, not thrown.
-        final result = await client.runContainer(
-          image: 'python:3.12-slim',
-          command: ['python', '-c', 'raise Exception()'],
-        );
-        expect(result, isA<DockerRunResult>());
-        expect(result.exitCode, equals(1));
-        expect(result.stdout, contains('app output'));
-        expect(result.stderr, contains('app error'));
-      });
+        'returns DockerRunResult (not exception) for non-125 non-zero exit codes',
+        () async {
+          final client = DockerClient(dockerPath: stubPath);
+          // Non-125 exits represent application-level errors inside the
+          // container and should be returned, not thrown.
+          final result = await client.runContainer(
+            image: 'python:3.12-slim',
+            command: ['python', '-c', 'raise Exception()'],
+          );
+          expect(result, isA<DockerRunResult>());
+          expect(result.exitCode, equals(1));
+          expect(result.stdout, contains('app output'));
+          expect(result.stderr, contains('app error'));
+        },
+      );
     });
 
     group('runContainer() command construction', () {
@@ -653,10 +598,7 @@ void main() {
         final result = await client.runContainer(
           image: 'alpine',
           command: ['ls'],
-          volumes: {
-            '/host/a': '/container/a',
-            '/host/b': '/container/b',
-          },
+          volumes: {'/host/a': '/container/a', '/host/b': '/container/b'},
         );
         final args = result.stdout.split('\n');
         expect(args, contains('/host/a:/container/a'));
@@ -760,24 +702,23 @@ void main() {
     // DockerClient.pullImage()
     // =========================================================================
     group('pullImage()', () {
-      test('throws DockerNotAvailableException when docker binary missing',
-          () async {
-        final client = DockerClient(
-          dockerPath: '/non/existent/docker_xyz_000',
-        );
-        expect(
-          () => client.pullImage('alpine:latest'),
-          throwsA(isA<DockerNotAvailableException>()),
-        );
-      });
+      test(
+        'throws DockerNotAvailableException when docker binary missing',
+        () async {
+          final client = DockerClient(
+            dockerPath: '/non/existent/docker_xyz_000',
+          );
+          expect(
+            () => client.pullImage('alpine:latest'),
+            throwsA(isA<DockerNotAvailableException>()),
+          );
+        },
+      );
 
       test('succeeds when stub exits with 0', () async {
-        final dir =
-            await Directory.systemTemp.createTemp('docker_pull_ok_');
+        final dir = await Directory.systemTemp.createTemp('docker_pull_ok_');
         final stub = File('${dir.path}/docker');
-        await stub.writeAsString(
-          '#!/bin/sh\nexit 0\n',
-        );
+        await stub.writeAsString('#!/bin/sh\nexit 0\n');
         await Process.run('chmod', ['+x', stub.path]);
 
         final client = DockerClient(dockerPath: stub.path);
@@ -785,55 +726,56 @@ void main() {
         await client.pullImage('alpine:latest');
       });
 
-      test('throws DockerExecutionException when pull fails (non-zero exit)',
-          () async {
-        final dir =
-            await Directory.systemTemp.createTemp('docker_pull_fail_');
-        final stub = File('${dir.path}/docker');
-        await stub.writeAsString(
-          '#!/bin/sh\n'
-          'echo "Error: manifest not found" >&2\n'
-          'exit 1\n',
-        );
-        await Process.run('chmod', ['+x', stub.path]);
+      test(
+        'throws DockerExecutionException when pull fails (non-zero exit)',
+        () async {
+          final dir = await Directory.systemTemp.createTemp(
+            'docker_pull_fail_',
+          );
+          final stub = File('${dir.path}/docker');
+          await stub.writeAsString(
+            '#!/bin/sh\n'
+            'echo "Error: manifest not found" >&2\n'
+            'exit 1\n',
+          );
+          await Process.run('chmod', ['+x', stub.path]);
 
-        final client = DockerClient(dockerPath: stub.path);
-        expect(
-          () => client.pullImage('nonexistent-image:v999'),
-          throwsA(isA<DockerExecutionException>()),
-        );
-      });
+          final client = DockerClient(dockerPath: stub.path);
+          expect(
+            () => client.pullImage('nonexistent-image:v999'),
+            throwsA(isA<DockerExecutionException>()),
+          );
+        },
+      );
 
-      test('DockerExecutionException from pullImage has stderr and exitCode',
-          () async {
-        final dir =
-            await Directory.systemTemp.createTemp('docker_pull_err_');
-        final stub = File('${dir.path}/docker');
-        await stub.writeAsString(
-          '#!/bin/sh\n'
-          'echo "pull error details" >&2\n'
-          'exit 1\n',
-        );
-        await Process.run('chmod', ['+x', stub.path]);
+      test(
+        'DockerExecutionException from pullImage has stderr and exitCode',
+        () async {
+          final dir = await Directory.systemTemp.createTemp('docker_pull_err_');
+          final stub = File('${dir.path}/docker');
+          await stub.writeAsString(
+            '#!/bin/sh\n'
+            'echo "pull error details" >&2\n'
+            'exit 1\n',
+          );
+          await Process.run('chmod', ['+x', stub.path]);
 
-        final client = DockerClient(dockerPath: stub.path);
-        try {
-          await client.pullImage('bad-image');
-          fail('Expected DockerExecutionException');
-        } on DockerExecutionException catch (e) {
-          expect(e.exitCode, equals(1));
-          expect(e.stderr, contains('pull error details'));
-          expect(e.message, contains('bad-image'));
-        }
-      });
+          final client = DockerClient(dockerPath: stub.path);
+          try {
+            await client.pullImage('bad-image');
+            fail('Expected DockerExecutionException');
+          } on DockerExecutionException catch (e) {
+            expect(e.exitCode, equals(1));
+            expect(e.stderr, contains('pull error details'));
+            expect(e.message, contains('bad-image'));
+          }
+        },
+      );
 
       test('logs info messages during pull', () async {
-        final dir =
-            await Directory.systemTemp.createTemp('docker_pull_log_');
+        final dir = await Directory.systemTemp.createTemp('docker_pull_log_');
         final stub = File('${dir.path}/docker');
-        await stub.writeAsString(
-          '#!/bin/sh\nexit 0\n',
-        );
+        await stub.writeAsString('#!/bin/sh\nexit 0\n');
         await Process.run('chmod', ['+x', stub.path]);
 
         final logger = _RecordingLogger();
@@ -856,14 +798,9 @@ void main() {
       test('uses SilentLogger by default (no output)', () async {
         // This test just verifies construction with no logger doesn't
         // cause errors when methods log.
-        final client = DockerClient(
-          dockerPath: '/non/existent/docker_xyz_000',
-        );
+        final client = DockerClient(dockerPath: '/non/existent/docker_xyz_000');
         try {
-          await client.runContainer(
-            image: 'alpine',
-            command: ['echo'],
-          );
+          await client.runContainer(image: 'alpine', command: ['echo']);
         } on DockerNotAvailableException {
           // expected
         }
@@ -885,14 +822,8 @@ void main() {
 
         final debugMessages = logger.messagesAt(LogLevel.debug);
         // Should log the full docker command
-        expect(
-          debugMessages.any((m) => m.contains('run')),
-          isTrue,
-        );
-        expect(
-          debugMessages.any((m) => m.contains('alpine:3.18')),
-          isTrue,
-        );
+        expect(debugMessages.any((m) => m.contains('run')), isTrue);
+        expect(debugMessages.any((m) => m.contains('alpine:3.18')), isTrue);
       });
 
       test('debug log includes exitCode after successful run', () async {
@@ -903,10 +834,7 @@ void main() {
 
         final logger = _RecordingLogger();
         final client = DockerClient(dockerPath: stub.path, logger: logger);
-        await client.runContainer(
-          image: 'alpine',
-          command: ['echo'],
-        );
+        await client.runContainer(image: 'alpine', command: ['echo']);
 
         final debugMessages = logger.messagesAt(LogLevel.debug);
         expect(
@@ -922,8 +850,7 @@ void main() {
     // =========================================================================
     group('isAvailable() with stubs', () {
       test('returns true when docker info succeeds (exit code 0)', () async {
-        final dir =
-            await Directory.systemTemp.createTemp('docker_avail_');
+        final dir = await Directory.systemTemp.createTemp('docker_avail_');
         final stub = File('${dir.path}/docker');
         await stub.writeAsString('#!/bin/sh\nexit 0\n');
         await Process.run('chmod', ['+x', stub.path]);
@@ -933,8 +860,7 @@ void main() {
       });
 
       test('returns false when docker info fails (exit code 1)', () async {
-        final dir =
-            await Directory.systemTemp.createTemp('docker_unavail_');
+        final dir = await Directory.systemTemp.createTemp('docker_unavail_');
         final stub = File('${dir.path}/docker');
         await stub.writeAsString('#!/bin/sh\nexit 1\n');
         await Process.run('chmod', ['+x', stub.path]);
@@ -949,8 +875,7 @@ void main() {
     // =========================================================================
     group('isImageAvailable() with stubs', () {
       test('returns true when docker image inspect succeeds', () async {
-        final dir =
-            await Directory.systemTemp.createTemp('docker_img_ok_');
+        final dir = await Directory.systemTemp.createTemp('docker_img_ok_');
         final stub = File('${dir.path}/docker');
         await stub.writeAsString('#!/bin/sh\nexit 0\n');
         await Process.run('chmod', ['+x', stub.path]);
@@ -960,17 +885,13 @@ void main() {
       });
 
       test('returns false when docker image inspect fails', () async {
-        final dir =
-            await Directory.systemTemp.createTemp('docker_img_fail_');
+        final dir = await Directory.systemTemp.createTemp('docker_img_fail_');
         final stub = File('${dir.path}/docker');
         await stub.writeAsString('#!/bin/sh\nexit 1\n');
         await Process.run('chmod', ['+x', stub.path]);
 
         final client = DockerClient(dockerPath: stub.path);
-        expect(
-          await client.isImageAvailable('nonexistent:v999'),
-          isFalse,
-        );
+        expect(await client.isImageAvailable('nonexistent:v999'), isFalse);
       });
     });
   });

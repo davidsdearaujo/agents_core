@@ -9,13 +9,19 @@ library;
 
 export 'src/agent/agent.dart';
 export 'src/agent/agent_result.dart';
+export 'src/agent/agent_stop_reason.dart';
 export 'src/agent/react_agent.dart';
 export 'src/agent/simple_agent.dart';
+// LLM client abstraction and the built-in LM Studio implementation.
+export 'src/client/llm_client.dart';
 export 'src/client/lm_studio_client.dart';
+
 export 'src/client/lm_studio_http_client.dart';
-export 'src/client/sse_parser.dart';
 export 'src/config/agents_core_config.dart';
+export 'src/config/docker_config.dart';
 export 'src/config/logger.dart';
+export 'src/config/logging_config.dart';
+export 'src/config/lm_studio_config.dart';
 export 'src/context/file_context.dart';
 export 'src/context/file_context_tools.dart';
 export 'src/docker/docker_client.dart';
@@ -39,8 +45,10 @@ export 'src/orchestrator/agent_loop.dart';
 export 'src/orchestrator/orchestrator.dart';
 export 'src/orchestrator/orchestrator_step.dart';
 export 'src/orchestrator/step_result.dart';
-export 'src/python/file_context_tools.dart';
+export 'src/orchestrator/task_prompt.dart';
 export 'src/python/python_execution_tool.dart';
 export 'src/python/python_tool_agent.dart';
 export 'src/quick/ask.dart';
 export 'src/quick/conversation.dart';
+export 'src/utils/disposable.dart';
+export 'src/utils/text_similarity.dart';

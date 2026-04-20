@@ -36,7 +36,10 @@ void main() {
     });
 
     test('fromString parses system', () {
-      expect(ChatMessageRole.fromString('system'), equals(ChatMessageRole.system));
+      expect(
+        ChatMessageRole.fromString('system'),
+        equals(ChatMessageRole.system),
+      );
     });
 
     test('fromString parses user', () {
@@ -44,7 +47,10 @@ void main() {
     });
 
     test('fromString parses assistant', () {
-      expect(ChatMessageRole.fromString('assistant'), equals(ChatMessageRole.assistant));
+      expect(
+        ChatMessageRole.fromString('assistant'),
+        equals(ChatMessageRole.assistant),
+      );
     });
 
     test('fromString parses tool', () {
@@ -65,13 +71,19 @@ void main() {
     });
 
     test('creates system message', () {
-      final msg = ChatMessage(role: ChatMessageRole.system, content: 'You are helpful.');
+      final msg = ChatMessage(
+        role: ChatMessageRole.system,
+        content: 'You are helpful.',
+      );
       expect(msg.role, equals(ChatMessageRole.system));
       expect(msg.content, equals('You are helpful.'));
     });
 
     test('creates assistant message', () {
-      final msg = ChatMessage(role: ChatMessageRole.assistant, content: 'I can help.');
+      final msg = ChatMessage(
+        role: ChatMessageRole.assistant,
+        content: 'I can help.',
+      );
       expect(msg.role, equals(ChatMessageRole.assistant));
       expect(msg.content, equals('I can help.'));
     });
@@ -107,14 +119,20 @@ void main() {
     });
 
     test('system message serializes correctly', () {
-      final msg = ChatMessage(role: ChatMessageRole.system, content: 'Be helpful');
+      final msg = ChatMessage(
+        role: ChatMessageRole.system,
+        content: 'Be helpful',
+      );
       final json = msg.toJson();
       expect(json['role'], equals('system'));
       expect(json['content'], equals('Be helpful'));
     });
 
     test('assistant message serializes correctly', () {
-      final msg = ChatMessage(role: ChatMessageRole.assistant, content: 'Sure!');
+      final msg = ChatMessage(
+        role: ChatMessageRole.assistant,
+        content: 'Sure!',
+      );
       final json = msg.toJson();
       expect(json['role'], equals('assistant'));
       expect(json['content'], equals('Sure!'));
@@ -193,7 +211,10 @@ void main() {
 
   group('ChatMessage — round-trip', () {
     test('user message round-trips through toJson/fromJson', () {
-      final original = ChatMessage(role: ChatMessageRole.user, content: 'Hello!');
+      final original = ChatMessage(
+        role: ChatMessageRole.user,
+        content: 'Hello!',
+      );
       final restored = ChatMessage.fromJson(original.toJson());
       expect(restored.role, equals(original.role));
       expect(restored.content, equals(original.content));

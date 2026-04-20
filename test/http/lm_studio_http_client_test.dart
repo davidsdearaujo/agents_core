@@ -43,24 +43,21 @@ class _TestServer {
 
 /// Builds a typical LM Studio API error body for a given [type] and [message].
 Map<String, dynamic> _apiError(String type, String message) => {
-      'error': {
-        'type': type,
-        'message': message,
-      },
-    };
+  'error': {'type': type, 'message': message},
+};
 
 /// Builds an LM Studio success body (e.g. minimal chat completion).
 Map<String, dynamic> get _successBody => {
-      'id': 'cmpl-123',
-      'object': 'chat.completion',
-      'choices': [
-        {
-          'message': {'role': 'assistant', 'content': 'Hello!'},
-          'finish_reason': 'stop',
-          'index': 0,
-        }
-      ],
-    };
+  'id': 'cmpl-123',
+  'object': 'chat.completion',
+  'choices': [
+    {
+      'message': {'role': 'assistant', 'content': 'Hello!'},
+      'finish_reason': 'stop',
+      'index': 0,
+    },
+  ],
+};
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -98,8 +95,11 @@ void main() {
         await expectLater(
           () => client.post('/v1/chat/completions', {}),
           throwsA(
-            isA<LmStudioApiException>()
-                .having((e) => e.statusCode, 'statusCode', 404),
+            isA<LmStudioApiException>().having(
+              (e) => e.statusCode,
+              'statusCode',
+              404,
+            ),
           ),
         );
       });
@@ -108,8 +108,11 @@ void main() {
         await expectLater(
           () => client.post('/v1/chat/completions', {}),
           throwsA(
-            isA<LmStudioApiException>()
-                .having((e) => e.isModelNotFound, 'isModelNotFound', isTrue),
+            isA<LmStudioApiException>().having(
+              (e) => e.isModelNotFound,
+              'isModelNotFound',
+              isTrue,
+            ),
           ),
         );
       });
@@ -181,8 +184,11 @@ void main() {
         await expectLater(
           () => client.post('/v1/chat/completions', {}),
           throwsA(
-            isA<LmStudioApiException>()
-                .having((e) => e.statusCode, 'statusCode', 400),
+            isA<LmStudioApiException>().having(
+              (e) => e.statusCode,
+              'statusCode',
+              400,
+            ),
           ),
         );
       });
@@ -204,8 +210,11 @@ void main() {
         await expectLater(
           () => client.post('/v1/chat/completions', {}),
           throwsA(
-            isA<LmStudioApiException>()
-                .having((e) => e.isModelNotFound, 'isModelNotFound', isFalse),
+            isA<LmStudioApiException>().having(
+              (e) => e.isModelNotFound,
+              'isModelNotFound',
+              isFalse,
+            ),
           ),
         );
       });
@@ -214,8 +223,11 @@ void main() {
         await expectLater(
           () => client.post('/v1/chat/completions', {}),
           throwsA(
-            isA<LmStudioApiException>()
-                .having((e) => e.isRateLimited, 'isRateLimited', isFalse),
+            isA<LmStudioApiException>().having(
+              (e) => e.isRateLimited,
+              'isRateLimited',
+              isFalse,
+            ),
           ),
         );
       });
@@ -251,8 +263,11 @@ void main() {
         await expectLater(
           () => client.post('/v1/chat/completions', {}),
           throwsA(
-            isA<LmStudioApiException>()
-                .having((e) => e.statusCode, 'statusCode', 429),
+            isA<LmStudioApiException>().having(
+              (e) => e.statusCode,
+              'statusCode',
+              429,
+            ),
           ),
         );
       });
@@ -261,8 +276,11 @@ void main() {
         await expectLater(
           () => client.post('/v1/chat/completions', {}),
           throwsA(
-            isA<LmStudioApiException>()
-                .having((e) => e.isRateLimited, 'isRateLimited', isTrue),
+            isA<LmStudioApiException>().having(
+              (e) => e.isRateLimited,
+              'isRateLimited',
+              isTrue,
+            ),
           ),
         );
       });
@@ -271,8 +289,11 @@ void main() {
         await expectLater(
           () => client.post('/v1/chat/completions', {}),
           throwsA(
-            isA<LmStudioApiException>()
-                .having((e) => e.isModelNotFound, 'isModelNotFound', isFalse),
+            isA<LmStudioApiException>().having(
+              (e) => e.isModelNotFound,
+              'isModelNotFound',
+              isFalse,
+            ),
           ),
         );
       });
@@ -321,8 +342,11 @@ void main() {
         await expectLater(
           () => client.post('/v1/chat/completions', {}),
           throwsA(
-            isA<LmStudioApiException>()
-                .having((e) => e.statusCode, 'statusCode', 500),
+            isA<LmStudioApiException>().having(
+              (e) => e.statusCode,
+              'statusCode',
+              500,
+            ),
           ),
         );
       });
@@ -374,8 +398,11 @@ void main() {
         await expectLater(
           () => client.post('/v1/chat/completions', {}),
           throwsA(
-            isA<LmStudioApiException>()
-                .having((e) => e.statusCode, 'statusCode', 503),
+            isA<LmStudioApiException>().having(
+              (e) => e.statusCode,
+              'statusCode',
+              503,
+            ),
           ),
         );
       });
@@ -411,8 +438,11 @@ void main() {
         await expectLater(
           () => client.post('/v1/chat/completions', {}),
           throwsA(
-            isA<LmStudioApiException>()
-                .having((e) => e.statusCode, 'statusCode', 401),
+            isA<LmStudioApiException>().having(
+              (e) => e.statusCode,
+              'statusCode',
+              401,
+            ),
           ),
         );
       });
@@ -437,10 +467,7 @@ void main() {
       test('does NOT throw on 200 response', () async {
         // Use `completes` (not `returnsNormally`) because post() is async —
         // `returnsNormally` only checks synchronous throws.
-        await expectLater(
-          client.post('/v1/chat/completions', {}),
-          completes,
-        );
+        await expectLater(client.post('/v1/chat/completions', {}), completes);
       });
 
       test('returns a Map on 200 response', () async {
@@ -485,8 +512,11 @@ void main() {
         await expectLater(
           () => client.get('/v1/models'),
           throwsA(
-            isA<LmStudioApiException>()
-                .having((e) => e.statusCode, 'statusCode', 404),
+            isA<LmStudioApiException>().having(
+              (e) => e.statusCode,
+              'statusCode',
+              404,
+            ),
           ),
         );
       });

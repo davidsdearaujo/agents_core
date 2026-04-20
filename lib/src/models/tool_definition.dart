@@ -57,11 +57,11 @@ class ToolDefinition {
   /// Returns a map with `type` set to `"function"` and a nested `function`
   /// object containing `name`, `description`, and `parameters`.
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'type': 'function',
-        'function': <String, dynamic>{
-          'name': name,
-          'description': description,
-          'parameters': parameters,
-        },
-      };
+    'type': 'function',
+    'function': <String, dynamic>{
+      'name': name,
+      'description': description,
+      'parameters': parameters,
+    },
+  };
 }

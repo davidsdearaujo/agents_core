@@ -79,8 +79,9 @@ class ChatCompletionChunkChoice {
   /// Deserializes a [ChatCompletionChunkChoice] from a JSON map.
   factory ChatCompletionChunkChoice.fromJson(Map<String, dynamic> json) {
     return ChatCompletionChunkChoice(
-      delta:
-          ChatCompletionDelta.fromJson(json['delta'] as Map<String, dynamic>),
+      delta: ChatCompletionDelta.fromJson(
+        json['delta'] as Map<String, dynamic>,
+      ),
       finishReason: json['finish_reason'] as String?,
     );
   }
@@ -96,9 +97,9 @@ class ChatCompletionChunkChoice {
 
   /// Serializes this choice to a JSON-compatible map.
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'delta': delta.toJson(),
-        'finish_reason': finishReason,
-      };
+    'delta': delta.toJson(),
+    'finish_reason': finishReason,
+  };
 }
 
 /// A single Server-Sent Event chunk from a streaming chat completion.
@@ -132,8 +133,10 @@ class ChatCompletionChunk {
     return ChatCompletionChunk(
       id: json['id'] as String,
       choices: rawChoices
-          .map((c) =>
-              ChatCompletionChunkChoice.fromJson(c as Map<String, dynamic>))
+          .map(
+            (c) =>
+                ChatCompletionChunkChoice.fromJson(c as Map<String, dynamic>),
+          )
           .toList(),
     );
   }
@@ -146,7 +149,7 @@ class ChatCompletionChunk {
 
   /// Serializes this chunk to a JSON-compatible map.
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'choices': choices.map((c) => c.toJson()).toList(),
-      };
+    'id': id,
+    'choices': choices.map((c) => c.toJson()).toList(),
+  };
 }

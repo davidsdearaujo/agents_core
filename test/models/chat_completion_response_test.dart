@@ -109,7 +109,10 @@ void main() {
     });
 
     test('finishReason can be null', () {
-      final msg = ChatMessage(role: ChatMessageRole.assistant, content: 'Partial');
+      final msg = ChatMessage(
+        role: ChatMessageRole.assistant,
+        content: 'Partial',
+      );
       final choice = ChatCompletionChoice(message: msg, finishReason: null);
       expect(choice.finishReason, isNull);
     });
@@ -122,7 +125,10 @@ void main() {
 
     test('accepts tool_calls finishReason', () {
       final msg = ChatMessage(role: ChatMessageRole.assistant, content: '');
-      final choice = ChatCompletionChoice(message: msg, finishReason: 'tool_calls');
+      final choice = ChatCompletionChoice(
+        message: msg,
+        finishReason: 'tool_calls',
+      );
       expect(choice.finishReason, equals('tool_calls'));
     });
   });
@@ -173,7 +179,11 @@ void main() {
     test('creates with id, choices, and usage', () {
       final msg = ChatMessage(role: ChatMessageRole.assistant, content: 'Hi');
       final choice = ChatCompletionChoice(message: msg, finishReason: 'stop');
-      final usage = CompletionUsage(promptTokens: 10, completionTokens: 5, totalTokens: 15);
+      final usage = CompletionUsage(
+        promptTokens: 10,
+        completionTokens: 5,
+        totalTokens: 15,
+      );
       final response = ChatCompletionResponse(
         id: 'chatcmpl-xyz',
         choices: [choice],
@@ -185,11 +195,21 @@ void main() {
     });
 
     test('accepts multiple choices (n > 1)', () {
-      final msg1 = ChatMessage(role: ChatMessageRole.assistant, content: 'Option A');
-      final msg2 = ChatMessage(role: ChatMessageRole.assistant, content: 'Option B');
+      final msg1 = ChatMessage(
+        role: ChatMessageRole.assistant,
+        content: 'Option A',
+      );
+      final msg2 = ChatMessage(
+        role: ChatMessageRole.assistant,
+        content: 'Option B',
+      );
       final choice1 = ChatCompletionChoice(message: msg1, finishReason: 'stop');
       final choice2 = ChatCompletionChoice(message: msg2, finishReason: 'stop');
-      final usage = CompletionUsage(promptTokens: 5, completionTokens: 10, totalTokens: 15);
+      final usage = CompletionUsage(
+        promptTokens: 5,
+        completionTokens: 10,
+        totalTokens: 15,
+      );
       final response = ChatCompletionResponse(
         id: 'chatcmpl-multi',
         choices: [choice1, choice2],
@@ -205,8 +225,14 @@ void main() {
       final response = ChatCompletionResponse.fromJson(json);
       expect(response.id, equals('chatcmpl-abc123'));
       expect(response.choices.length, equals(1));
-      expect(response.choices[0].message.role, equals(ChatMessageRole.assistant));
-      expect(response.choices[0].message.content, equals('Hello! How can I help?'));
+      expect(
+        response.choices[0].message.role,
+        equals(ChatMessageRole.assistant),
+      );
+      expect(
+        response.choices[0].message.content,
+        equals('Hello! How can I help?'),
+      );
       expect(response.choices[0].finishReason, equals('stop'));
       expect(response.usage.promptTokens, equals(10));
       expect(response.usage.completionTokens, equals(8));
@@ -232,7 +258,11 @@ void main() {
     });
 
     test('parses zero-token usage', () {
-      final json = buildResponseJson(promptTokens: 0, completionTokens: 0, totalTokens: 0);
+      final json = buildResponseJson(
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+      );
       final response = ChatCompletionResponse.fromJson(json);
       expect(response.usage.promptTokens, equals(0));
       expect(response.usage.completionTokens, equals(0));
@@ -259,7 +289,11 @@ void main() {
     });
 
     test('usage serialized with snake_case keys', () {
-      final json = buildResponseJson(promptTokens: 7, completionTokens: 3, totalTokens: 10);
+      final json = buildResponseJson(
+        promptTokens: 7,
+        completionTokens: 3,
+        totalTokens: 10,
+      );
       final response = ChatCompletionResponse.fromJson(json);
       final output = response.toJson();
       final usage = output['usage'] as Map<String, dynamic>;
@@ -276,10 +310,19 @@ void main() {
       final restored = ChatCompletionResponse.fromJson(original.toJson());
       expect(restored.id, equals(original.id));
       expect(restored.choices.length, equals(original.choices.length));
-      expect(restored.choices[0].message.content, equals(original.choices[0].message.content));
-      expect(restored.choices[0].finishReason, equals(original.choices[0].finishReason));
+      expect(
+        restored.choices[0].message.content,
+        equals(original.choices[0].message.content),
+      );
+      expect(
+        restored.choices[0].finishReason,
+        equals(original.choices[0].finishReason),
+      );
       expect(restored.usage.promptTokens, equals(original.usage.promptTokens));
-      expect(restored.usage.completionTokens, equals(original.usage.completionTokens));
+      expect(
+        restored.usage.completionTokens,
+        equals(original.usage.completionTokens),
+      );
       expect(restored.usage.totalTokens, equals(original.usage.totalTokens));
     });
   });

@@ -6,10 +6,7 @@ void main() {
   const simpleParams = <String, dynamic>{
     'type': 'object',
     'properties': {
-      'location': {
-        'type': 'string',
-        'description': 'The city and state',
-      },
+      'location': {'type': 'string', 'description': 'The city and state'},
     },
     'required': ['location'],
   };
@@ -30,7 +27,10 @@ void main() {
       final tool = ToolDefinition(
         name: 'no_op',
         description: '',
-        parameters: <String, dynamic>{'type': 'object', 'properties': <String, dynamic>{}},
+        parameters: <String, dynamic>{
+          'type': 'object',
+          'properties': <String, dynamic>{},
+        },
       );
       expect(tool.description, equals(''));
     });
@@ -39,7 +39,10 @@ void main() {
       final tool = ToolDefinition(
         name: 'no_params',
         description: 'A tool with no parameters',
-        parameters: <String, dynamic>{'type': 'object', 'properties': <String, dynamic>{}},
+        parameters: <String, dynamic>{
+          'type': 'object',
+          'properties': <String, dynamic>{},
+        },
       );
       expect(tool.parameters, isA<Map<String, dynamic>>());
     });
@@ -119,7 +122,10 @@ void main() {
         'function': {
           'name': 'empty_tool',
           'description': 'No params',
-          'parameters': <String, dynamic>{'type': 'object', 'properties': <String, dynamic>{}},
+          'parameters': <String, dynamic>{
+            'type': 'object',
+            'properties': <String, dynamic>{},
+          },
         },
       };
       final tool = ToolDefinition.fromJson(json);

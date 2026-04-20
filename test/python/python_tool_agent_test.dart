@@ -1,10 +1,11 @@
 // ignore_for_file: avoid_implementing_value_types
 
-import 'dart:collection';
 import 'dart:io';
 
 import 'package:agents_core/agents_core.dart';
 import 'package:test/test.dart';
+
+import '../helpers/mock_llm_client.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fake DockerClient
@@ -65,37 +66,6 @@ class _FakeDockerClient extends DockerClient {
     if (_throwOnRun != null) throw _throwOnRun;
     return _runResult;
   }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Fake LmStudioClient
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// A fake [LmStudioClient] that returns pre-configured [ChatCompletionResponse]
-/// objects from a queue without performing any real HTTP requests.
-class _FakeClient extends LmStudioClient {
-  _FakeClient(List<ChatCompletionResponse> responses)
-    : _queue = Queue.of(responses),
-      super(AgentsCoreConfig(logger: const SilentLogger()));
-
-  final Queue<ChatCompletionResponse> _queue;
-
-  /// Records every request passed to [chatCompletion].
-  final List<ChatCompletionRequest> capturedRequests = [];
-
-  @override
-  Future<ChatCompletionResponse> chatCompletion(
-    ChatCompletionRequest request,
-  ) async {
-    capturedRequests.add(request);
-    if (_queue.isEmpty) {
-      throw StateError('_FakeClient: no more responses queued');
-    }
-    return _queue.removeFirst();
-  }
-
-  @override
-  void dispose() {}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -191,7 +161,7 @@ void main() {
       final fakeDocker = _FakeDockerClient();
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient(const []),
+        client: MockLlmClient(const []),
         config: _config(),
         dockerClient: fakeDocker,
         fileContext: ctx,
@@ -202,7 +172,7 @@ void main() {
     test('exposes fileContext property', () {
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient(const []),
+        client: MockLlmClient(const []),
         config: _config(),
         dockerClient: _FakeDockerClient(),
         fileContext: ctx,
@@ -213,7 +183,7 @@ void main() {
     test('exposes dockerImage property with default value', () {
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient(const []),
+        client: MockLlmClient(const []),
         config: _config(),
         dockerClient: _FakeDockerClient(),
         fileContext: ctx,
@@ -224,7 +194,7 @@ void main() {
     test('custom dockerImage is stored', () {
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient(const []),
+        client: MockLlmClient(const []),
         config: _config(),
         dockerClient: _FakeDockerClient(),
         fileContext: ctx,
@@ -236,7 +206,7 @@ void main() {
     test('registers execute_python tool by default', () {
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient(const []),
+        client: MockLlmClient(const []),
         config: _config(),
         dockerClient: _FakeDockerClient(),
         fileContext: ctx,
@@ -247,7 +217,7 @@ void main() {
     test('without enableFileTools: only execute_python is registered', () {
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient(const []),
+        client: MockLlmClient(const []),
         config: _config(),
         dockerClient: _FakeDockerClient(),
         fileContext: ctx,
@@ -256,24 +226,26 @@ void main() {
       expect(agent.tools.first.name, 'execute_python');
     });
 
-    test('with enableFileTools: 4 tools registered', () {
+    test('with enableFileTools: 5 tools registered', () {
+      // 1 execute_python + 4 file tools (read, write, list, append)
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient(const []),
+        client: MockLlmClient(const []),
         config: _config(),
         dockerClient: _FakeDockerClient(),
         fileContext: ctx,
         enableFileTools: true,
       );
-      expect(agent.tools, hasLength(4));
+      expect(agent.tools, hasLength(5));
     });
 
     test(
-      'with enableFileTools: includes read_file, write_file, list_files',
+      'with enableFileTools: includes execute_python, read_file, write_file, '
+      'list_files, append_file',
       () {
         final agent = PythonToolAgent(
           name: 'test',
-          client: _FakeClient(const []),
+          client: MockLlmClient(const []),
           config: _config(),
           dockerClient: _FakeDockerClient(),
           fileContext: ctx,
@@ -287,6 +259,7 @@ void main() {
             'read_file',
             'write_file',
             'list_files',
+            'append_file',
           ]),
         );
       },
@@ -295,7 +268,7 @@ void main() {
     test('without enableFileTools: file tools NOT registered', () {
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient(const []),
+        client: MockLlmClient(const []),
         config: _config(),
         dockerClient: _FakeDockerClient(),
         fileContext: ctx,
@@ -309,7 +282,7 @@ void main() {
     test('creates a temp workspace when fileContext is null', () {
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient(const []),
+        client: MockLlmClient(const []),
         config: _config(),
         dockerClient: _FakeDockerClient(),
       );
@@ -325,7 +298,7 @@ void main() {
       );
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient(const []),
+        client: MockLlmClient(const []),
         config: _config(),
         dockerClient: _FakeDockerClient(),
         fileContext: ctx,
@@ -337,7 +310,7 @@ void main() {
     test('maxIterations defaults to 15', () {
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient(const []),
+        client: MockLlmClient(const []),
         config: _config(),
         dockerClient: _FakeDockerClient(),
         fileContext: ctx,
@@ -348,7 +321,7 @@ void main() {
     test('custom maxIterations is respected', () {
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient(const []),
+        client: MockLlmClient(const []),
         config: _config(),
         dockerClient: _FakeDockerClient(),
         fileContext: ctx,
@@ -361,7 +334,7 @@ void main() {
       const customPrompt = 'You are a custom Python agent.';
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient(const []),
+        client: MockLlmClient(const []),
         config: _config(),
         dockerClient: _FakeDockerClient(),
         fileContext: ctx,
@@ -373,7 +346,7 @@ void main() {
     test('default systemPrompt contains Python execution context', () {
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient(const []),
+        client: MockLlmClient(const []),
         config: _config(),
         dockerClient: _FakeDockerClient(),
         fileContext: ctx,
@@ -385,7 +358,7 @@ void main() {
     test('name is stored correctly', () {
       final agent = PythonToolAgent(
         name: 'my-python-agent',
-        client: _FakeClient(const []),
+        client: MockLlmClient(const []),
         config: _config(),
         dockerClient: _FakeDockerClient(),
         fileContext: ctx,
@@ -414,7 +387,7 @@ void main() {
         final fakeDocker = _FakeDockerClient(available: false);
         final agent = PythonToolAgent(
           name: 'test',
-          client: _FakeClient(const []),
+          client: MockLlmClient(const []),
           config: _config(),
           dockerClient: fakeDocker,
           fileContext: ctx,
@@ -427,7 +400,7 @@ void main() {
     );
 
     test('does NOT call LLM when Docker is unavailable', () async {
-      final fakeClient = _FakeClient(const []);
+      final fakeClient = MockLlmClient(const []);
       final agent = PythonToolAgent(
         name: 'test',
         client: fakeClient,
@@ -452,7 +425,7 @@ void main() {
       );
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient([_textResp(content: 'done')]),
+        client: MockLlmClient([_textResp(content: 'done')]),
         config: _config(),
         dockerClient: fakeDocker,
         fileContext: ctx,
@@ -468,7 +441,7 @@ void main() {
       );
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient([_textResp(content: 'done')]),
+        client: MockLlmClient([_textResp(content: 'done')]),
         config: _config(),
         dockerClient: fakeDocker,
         fileContext: ctx,
@@ -484,7 +457,7 @@ void main() {
       );
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient([_textResp(content: 'done')]),
+        client: MockLlmClient([_textResp(content: 'done')]),
         config: _config(),
         dockerClient: fakeDocker,
         fileContext: ctx,
@@ -505,7 +478,7 @@ void main() {
       );
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient(const []),
+        client: MockLlmClient(const []),
         config: _config(),
         dockerClient: fakeDocker,
         fileContext: ctx,
@@ -521,7 +494,7 @@ void main() {
         available: true,
         imageAvailable: true,
       );
-      final fakeClient = _FakeClient([_textResp(content: 'answer')]);
+      final fakeClient = MockLlmClient([_textResp(content: 'answer')]);
       final agent = PythonToolAgent(
         name: 'test',
         client: fakeClient,
@@ -553,7 +526,7 @@ void main() {
     test('returns AgentResult with LLM output when no tool calls', () async {
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient([_textResp(content: 'The answer is 42.')]),
+        client: MockLlmClient([_textResp(content: 'The answer is 42.')]),
         config: _config(),
         dockerClient: _FakeDockerClient(),
         fileContext: ctx,
@@ -562,22 +535,22 @@ void main() {
       expect(result.output, 'The answer is 42.');
     });
 
-    test('stoppedReason is "completed" when LLM returns text', () async {
+    test('stoppedReason is completed when LLM returns text', () async {
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient([_textResp(content: 'done')]),
+        client: MockLlmClient([_textResp(content: 'done')]),
         config: _config(),
         dockerClient: _FakeDockerClient(),
         fileContext: ctx,
       );
       final result = await agent.run('task');
-      expect(result.stoppedReason, 'completed');
+      expect(result.stoppedReason, equals(AgentStopReason.completed));
     });
 
     test('tokensUsed reflects LLM usage', () async {
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient([
+        client: MockLlmClient([
           _textResp(content: 'ok', promptTokens: 20, completionTokens: 10),
         ]),
         config: _config(),
@@ -600,7 +573,7 @@ void main() {
         );
         final agent = PythonToolAgent(
           name: 'test',
-          client: _FakeClient([
+          client: MockLlmClient([
             _toolCallResp(
               toolName: 'execute_python',
               arguments: '{"code": "print(\'hello\')"}',
@@ -619,7 +592,7 @@ void main() {
     test('final LLM output is returned after tool call cycle', () async {
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient([
+        client: MockLlmClient([
           _toolCallResp(
             toolName: 'execute_python',
             arguments: '{"code": "print(42)"}',
@@ -643,7 +616,7 @@ void main() {
     test('toolCallsMade contains the execute_python call', () async {
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient([
+        client: MockLlmClient([
           _toolCallResp(
             toolName: 'execute_python',
             arguments: '{"code": "print(1)"}',
@@ -663,7 +636,7 @@ void main() {
     test(
       'second LLM request includes role:tool message with docker output',
       () async {
-        final fakeClient = _FakeClient([
+        final fakeClient = MockLlmClient([
           _toolCallResp(
             toolName: 'execute_python',
             arguments: '{"code": "print(\'result\')"}',
@@ -697,7 +670,7 @@ void main() {
     );
 
     test('tool result message toolCallId matches the tool call id', () async {
-      final fakeClient = _FakeClient([
+      final fakeClient = MockLlmClient([
         _toolCallResp(
           toolName: 'execute_python',
           arguments: '{"code": "x=1"}',
@@ -728,7 +701,7 @@ void main() {
       final fakeDocker = _FakeDockerClient();
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient([
+        client: MockLlmClient([
           _toolCallResp(
             toolName: 'execute_python',
             arguments: '{"code": "print(1)"}',
@@ -764,7 +737,7 @@ void main() {
         // But we need another response queued for the LLM to respond.
         //
         // Re-add response for when error is fed back to LLM:
-        final fakeClient = _FakeClient([
+        final fakeClient = MockLlmClient([
           _toolCallResp(
             toolName: 'execute_python',
             arguments: '{"code": "print(1)"}',
@@ -792,7 +765,7 @@ void main() {
     test(
       'failed Python execution (non-zero exit) returns error string to LLM',
       () async {
-        final fakeClient = _FakeClient([
+        final fakeClient = MockLlmClient([
           _toolCallResp(
             toolName: 'execute_python',
             arguments: '{"code": "raise ValueError()"}',
@@ -830,7 +803,7 @@ void main() {
         final fakeDocker = _FakeDockerClient();
         final agent = PythonToolAgent(
           name: 'test',
-          client: _FakeClient([
+          client: MockLlmClient([
             _toolCallResp(
               toolName: 'execute_python',
               arguments: '{"code": "print(1)"}',
@@ -855,7 +828,7 @@ void main() {
     test('tokensUsed accumulates across iterations', () async {
       final agent = PythonToolAgent(
         name: 'test',
-        client: _FakeClient([
+        client: MockLlmClient([
           _toolCallResp(
             toolName: 'execute_python',
             arguments: '{"code": "x=1"}',

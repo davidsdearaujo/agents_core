@@ -52,6 +52,7 @@ class _CapturingServer {
   static Future<_CapturingServer> start({
     int statusCode = 200,
     Map<String, dynamic>? responseBody,
+
     /// Optional delay before responding — useful for timeout testing.
     Duration responseDelay = Duration.zero,
   }) async {
@@ -66,12 +67,14 @@ class _CapturingServer {
       // Read body (cast Uint8List → List<int> for utf8.decoder).
       final body = await utf8.decoder.bind(req.cast<List<int>>()).join();
 
-      requests.add(_CapturedRequest(
-        method: req.method,
-        path: req.uri.path,
-        headers: headers,
-        body: body,
-      ));
+      requests.add(
+        _CapturedRequest(
+          method: req.method,
+          path: req.uri.path,
+          headers: headers,
+          body: body,
+        ),
+      );
 
       if (responseDelay > Duration.zero) {
         await Future<void>.delayed(responseDelay);
@@ -120,15 +123,15 @@ void main() {
   group('LmStudioHttpClient — construction', () {
     test('can be instantiated with an AgentsCoreConfig', () {
       expect(
-        () => LmStudioHttpClient(
-          config: _config('http://localhost:1234'),
-        ),
+        () => LmStudioHttpClient(config: _config('http://localhost:1234')),
         returnsNormally,
       );
     });
 
     test('dispose() does not throw', () {
-      final client = LmStudioHttpClient(config: _config('http://localhost:1234'));
+      final client = LmStudioHttpClient(
+        config: _config('http://localhost:1234'),
+      );
       expect(client.dispose, returnsNormally);
     });
   });
@@ -164,18 +167,12 @@ void main() {
 
     test('sends Accept: application/json header', () async {
       await client.get('/v1/models');
-      expect(
-        server.last.header('accept'),
-        contains('application/json'),
-      );
+      expect(server.last.header('accept'), contains('application/json'));
     });
 
     test('sends Content-Type: application/json header', () async {
       await client.get('/v1/models');
-      expect(
-        server.last.header('content-type'),
-        contains('application/json'),
-      );
+      expect(server.last.header('content-type'), contains('application/json'));
     });
 
     test('path is resolved relative to configured baseUrl', () async {
@@ -221,18 +218,12 @@ void main() {
 
     test('sends Content-Type: application/json header', () async {
       await client.post('/v1/chat/completions', {'model': 'llama3'});
-      expect(
-        server.last.header('content-type'),
-        contains('application/json'),
-      );
+      expect(server.last.header('content-type'), contains('application/json'));
     });
 
     test('sends Accept: application/json header', () async {
       await client.post('/v1/chat/completions', {'model': 'llama3'});
-      expect(
-        server.last.header('accept'),
-        contains('application/json'),
-      );
+      expect(server.last.header('accept'), contains('application/json'));
     });
 
     test('encodes body as valid JSON', () async {
@@ -278,8 +269,9 @@ void main() {
           ],
         },
       );
-      final client =
-          LmStudioHttpClient(config: _config('http://127.0.0.1:${server.port}'));
+      final client = LmStudioHttpClient(
+        config: _config('http://127.0.0.1:${server.port}'),
+      );
 
       final result = await client.get('/v1/models');
 
@@ -292,11 +284,10 @@ void main() {
     });
 
     test('returns a Map<String, dynamic>', () async {
-      final server = await _CapturingServer.start(
-        responseBody: {'ok': true},
+      final server = await _CapturingServer.start(responseBody: {'ok': true});
+      final client = LmStudioHttpClient(
+        config: _config('http://127.0.0.1:${server.port}'),
       );
-      final client =
-          LmStudioHttpClient(config: _config('http://127.0.0.1:${server.port}'));
 
       final result = await client.get('/v1/models');
       expect(result, isA<Map<String, dynamic>>());
@@ -307,8 +298,9 @@ void main() {
 
     test('does NOT throw on 200', () async {
       final server = await _CapturingServer.start(statusCode: 200);
-      final client =
-          LmStudioHttpClient(config: _config('http://127.0.0.1:${server.port}'));
+      final client = LmStudioHttpClient(
+        config: _config('http://127.0.0.1:${server.port}'),
+      );
 
       // Use `completes` (not `returnsNormally`) because the method is async
       // and `returnsNormally` only checks synchronous returns.
@@ -333,12 +325,13 @@ void main() {
               'message': {'role': 'assistant', 'content': 'Hi!'},
               'finish_reason': 'stop',
               'index': 0,
-            }
+            },
           ],
         },
       );
-      final client =
-          LmStudioHttpClient(config: _config('http://127.0.0.1:${server.port}'));
+      final client = LmStudioHttpClient(
+        config: _config('http://127.0.0.1:${server.port}'),
+      );
 
       final result = await client.post('/v1/chat/completions', {
         'model': 'llama3',
@@ -357,14 +350,12 @@ void main() {
 
     test('does NOT throw on 200', () async {
       final server = await _CapturingServer.start(statusCode: 200);
-      final client =
-          LmStudioHttpClient(config: _config('http://127.0.0.1:${server.port}'));
+      final client = LmStudioHttpClient(
+        config: _config('http://127.0.0.1:${server.port}'),
+      );
 
       // Use `completes` (not `returnsNormally`) because the method is async.
-      await expectLater(
-        client.post('/v1/chat/completions', {}),
-        completes,
-      );
+      await expectLater(client.post('/v1/chat/completions', {}), completes);
 
       client.dispose();
       await server.close();
@@ -385,8 +376,9 @@ void main() {
             statusCode: statusCode,
             responseBody: {'error': 'simulated error for $statusCode'},
           );
-          client =
-              LmStudioHttpClient(config: _config('http://127.0.0.1:${server.port}'));
+          client = LmStudioHttpClient(
+            config: _config('http://127.0.0.1:${server.port}'),
+          );
         });
 
         tearDown(() async {
@@ -401,16 +393,21 @@ void main() {
           );
         });
 
-        test('GET $statusCode exception carries statusCode=$statusCode',
-            () async {
-          await expectLater(
-            () => client.get('/v1/models'),
-            throwsA(
-              isA<LmStudioApiException>()
-                  .having((e) => e.statusCode, 'statusCode', statusCode),
-            ),
-          );
-        });
+        test(
+          'GET $statusCode exception carries statusCode=$statusCode',
+          () async {
+            await expectLater(
+              () => client.get('/v1/models'),
+              throwsA(
+                isA<LmStudioApiException>().having(
+                  (e) => e.statusCode,
+                  'statusCode',
+                  statusCode,
+                ),
+              ),
+            );
+          },
+        );
 
         test('POST $statusCode throws LmStudioApiException', () async {
           await expectLater(
@@ -423,8 +420,9 @@ void main() {
 
     test('GET exception carries correct statusCode', () async {
       final server = await _CapturingServer.start(statusCode: 404);
-      final client =
-          LmStudioHttpClient(config: _config('http://127.0.0.1:${server.port}'));
+      final client = LmStudioHttpClient(
+        config: _config('http://127.0.0.1:${server.port}'),
+      );
 
       LmStudioApiException? captured;
       try {
@@ -441,8 +439,9 @@ void main() {
 
     test('POST exception carries correct statusCode', () async {
       final server = await _CapturingServer.start(statusCode: 500);
-      final client =
-          LmStudioHttpClient(config: _config('http://127.0.0.1:${server.port}'));
+      final client = LmStudioHttpClient(
+        config: _config('http://127.0.0.1:${server.port}'),
+      );
 
       LmStudioApiException? captured;
       try {
@@ -464,12 +463,15 @@ void main() {
         req.response
           ..statusCode = 404
           ..headers.contentType = ContentType.json
-          ..write('{"error":{"type":"not_found","message":"model not loaded"}}');
+          ..write(
+            '{"error":{"type":"not_found","message":"model not loaded"}}',
+          );
         await req.response.close();
       });
 
-      final client =
-          LmStudioHttpClient(config: _config('http://127.0.0.1:${server.port}'));
+      final client = LmStudioHttpClient(
+        config: _config('http://127.0.0.1:${server.port}'),
+      );
 
       LmStudioApiException? captured;
       try {
@@ -486,40 +488,44 @@ void main() {
       await server.close(force: true);
     });
 
-    test('exception falls back to empty strings for malformed error body',
-        () async {
-      final server = await HttpServer.bind('127.0.0.1', 0);
-      server.listen((req) async {
-        await req.drain<void>();
-        req.response
-          ..statusCode = 500
-          ..headers.contentType = ContentType.json
-          ..write('not valid json');
-        await req.response.close();
-      });
+    test(
+      'exception falls back to empty strings for malformed error body',
+      () async {
+        final server = await HttpServer.bind('127.0.0.1', 0);
+        server.listen((req) async {
+          await req.drain<void>();
+          req.response
+            ..statusCode = 500
+            ..headers.contentType = ContentType.json
+            ..write('not valid json');
+          await req.response.close();
+        });
 
-      final client =
-          LmStudioHttpClient(config: _config('http://127.0.0.1:${server.port}'));
+        final client = LmStudioHttpClient(
+          config: _config('http://127.0.0.1:${server.port}'),
+        );
 
-      LmStudioApiException? captured;
-      try {
-        await client.get('/v1/models');
-      } on LmStudioApiException catch (e) {
-        captured = e;
-      }
+        LmStudioApiException? captured;
+        try {
+          await client.get('/v1/models');
+        } on LmStudioApiException catch (e) {
+          captured = e;
+        }
 
-      expect(captured, isNotNull);
-      expect(captured!.statusCode, equals(500));
-      expect(captured.errorType, isEmpty);
-      expect(captured.errorMessage, isEmpty);
-      client.dispose();
-      await server.close(force: true);
-    });
+        expect(captured, isNotNull);
+        expect(captured!.statusCode, equals(500));
+        expect(captured.errorType, isEmpty);
+        expect(captured.errorMessage, isEmpty);
+        client.dispose();
+        await server.close(force: true);
+      },
+    );
 
     test('exception toString includes statusCode', () async {
       final server = await _CapturingServer.start(statusCode: 500);
-      final client =
-          LmStudioHttpClient(config: _config('http://127.0.0.1:${server.port}'));
+      final client = LmStudioHttpClient(
+        config: _config('http://127.0.0.1:${server.port}'),
+      );
 
       LmStudioApiException? captured;
       try {
@@ -539,140 +545,171 @@ void main() {
   // ───────────────────────────────────────────────────────────────────────────
   // 7. Connection errors — LmStudioConnectionException wrapping
   // ───────────────────────────────────────────────────────────────────────────
-  group('LmStudioHttpClient — connection errors → LmStudioConnectionException',
-      () {
-    test('GET on refused-connection port throws LmStudioConnectionException',
+  group(
+    'LmStudioHttpClient — connection errors → LmStudioConnectionException',
+    () {
+      test(
+        'GET on refused-connection port throws LmStudioConnectionException',
         () async {
-      final port = await _closedPort();
-      final client = LmStudioHttpClient(config: _config('http://127.0.0.1:$port'));
+          final port = await _closedPort();
+          final client = LmStudioHttpClient(
+            config: _config('http://127.0.0.1:$port'),
+          );
 
-      await expectLater(
-        () => client.get('/v1/models'),
-        throwsA(isA<LmStudioConnectionException>()),
+          await expectLater(
+            () => client.get('/v1/models'),
+            throwsA(isA<LmStudioConnectionException>()),
+          );
+          client.dispose();
+        },
       );
-      client.dispose();
-    });
 
-    test('POST on refused-connection port throws LmStudioConnectionException',
+      test(
+        'POST on refused-connection port throws LmStudioConnectionException',
         () async {
-      final port = await _closedPort();
-      final client = LmStudioHttpClient(config: _config('http://127.0.0.1:$port'));
+          final port = await _closedPort();
+          final client = LmStudioHttpClient(
+            config: _config('http://127.0.0.1:$port'),
+          );
 
-      await expectLater(
-        () => client.post('/v1/chat/completions', {}),
-        throwsA(isA<LmStudioConnectionException>()),
+          await expectLater(
+            () => client.post('/v1/chat/completions', {}),
+            throwsA(isA<LmStudioConnectionException>()),
+          );
+          client.dispose();
+        },
       );
-      client.dispose();
-    });
 
-    test(
+      test(
         'LmStudioConnectionException from SocketException has isSocketError=true',
         () async {
-      final port = await _closedPort();
-      final client = LmStudioHttpClient(config: _config('http://127.0.0.1:$port'));
+          final port = await _closedPort();
+          final client = LmStudioHttpClient(
+            config: _config('http://127.0.0.1:$port'),
+          );
 
-      await expectLater(
-        () => client.get('/v1/models'),
-        throwsA(
-          isA<LmStudioConnectionException>()
-              .having((e) => e.isSocketError, 'isSocketError', isTrue),
-        ),
+          await expectLater(
+            () => client.get('/v1/models'),
+            throwsA(
+              isA<LmStudioConnectionException>().having(
+                (e) => e.isSocketError,
+                'isSocketError',
+                isTrue,
+              ),
+            ),
+          );
+          client.dispose();
+        },
       );
-      client.dispose();
-    });
 
-    test(
+      test(
         'LmStudioConnectionException from SocketException has isTimeout=false',
         () async {
-      final port = await _closedPort();
-      final client = LmStudioHttpClient(config: _config('http://127.0.0.1:$port'));
+          final port = await _closedPort();
+          final client = LmStudioHttpClient(
+            config: _config('http://127.0.0.1:$port'),
+          );
 
-      await expectLater(
-        () => client.get('/v1/models'),
-        throwsA(
-          isA<LmStudioConnectionException>()
-              .having((e) => e.isTimeout, 'isTimeout', isFalse),
-        ),
+          await expectLater(
+            () => client.get('/v1/models'),
+            throwsA(
+              isA<LmStudioConnectionException>().having(
+                (e) => e.isTimeout,
+                'isTimeout',
+                isFalse,
+              ),
+            ),
+          );
+          client.dispose();
+        },
       );
-      client.dispose();
-    });
 
-    test(
+      test(
         'LmStudioConnectionException wraps the underlying cause (non-null)',
         () async {
-      final port = await _closedPort();
-      final client = LmStudioHttpClient(config: _config('http://127.0.0.1:$port'));
+          final port = await _closedPort();
+          final client = LmStudioHttpClient(
+            config: _config('http://127.0.0.1:$port'),
+          );
 
-      LmStudioConnectionException? captured;
-      try {
-        await client.get('/v1/models');
-      } on LmStudioConnectionException catch (e) {
-        captured = e;
-      }
+          LmStudioConnectionException? captured;
+          try {
+            await client.get('/v1/models');
+          } on LmStudioConnectionException catch (e) {
+            captured = e;
+          }
 
-      expect(captured?.cause, isNotNull);
-      expect(captured?.cause, isA<SocketException>());
-      client.dispose();
-    });
+          expect(captured?.cause, isNotNull);
+          expect(captured?.cause, isA<SocketException>());
+          client.dispose();
+        },
+      );
 
-    test('LmStudioConnectionException carries a non-empty message', () async {
-      final port = await _closedPort();
-      final client = LmStudioHttpClient(config: _config('http://127.0.0.1:$port'));
+      test('LmStudioConnectionException carries a non-empty message', () async {
+        final port = await _closedPort();
+        final client = LmStudioHttpClient(
+          config: _config('http://127.0.0.1:$port'),
+        );
 
-      LmStudioConnectionException? captured;
-      try {
-        await client.get('/v1/models');
-      } on LmStudioConnectionException catch (e) {
-        captured = e;
-      }
+        LmStudioConnectionException? captured;
+        try {
+          await client.get('/v1/models');
+        } on LmStudioConnectionException catch (e) {
+          captured = e;
+        }
 
-      expect(captured?.message, isNotEmpty);
-      client.dispose();
-    });
+        expect(captured?.message, isNotEmpty);
+        client.dispose();
+      });
 
-    test('LmStudioConnectionException.toString() is non-empty', () async {
-      final port = await _closedPort();
-      final client = LmStudioHttpClient(config: _config('http://127.0.0.1:$port'));
+      test('LmStudioConnectionException.toString() is non-empty', () async {
+        final port = await _closedPort();
+        final client = LmStudioHttpClient(
+          config: _config('http://127.0.0.1:$port'),
+        );
 
-      LmStudioConnectionException? captured;
-      try {
-        await client.get('/v1/models');
-      } on LmStudioConnectionException catch (e) {
-        captured = e;
-      }
+        LmStudioConnectionException? captured;
+        try {
+          await client.get('/v1/models');
+        } on LmStudioConnectionException catch (e) {
+          captured = e;
+        }
 
-      expect(captured?.toString(), isNotEmpty);
-      expect(captured?.toString(), contains('LmStudioConnectionException'));
-      client.dispose();
-    });
+        expect(captured?.toString(), isNotEmpty);
+        expect(captured?.toString(), contains('LmStudioConnectionException'));
+        client.dispose();
+      });
 
-    test('LmStudioConnectionException carries the target URI', () async {
-      final port = await _closedPort();
-      final client = LmStudioHttpClient(config: _config('http://127.0.0.1:$port'));
+      test('LmStudioConnectionException carries the target URI', () async {
+        final port = await _closedPort();
+        final client = LmStudioHttpClient(
+          config: _config('http://127.0.0.1:$port'),
+        );
 
-      LmStudioConnectionException? captured;
-      try {
-        await client.get('/v1/models');
-      } on LmStudioConnectionException catch (e) {
-        captured = e;
-      }
+        LmStudioConnectionException? captured;
+        try {
+          await client.get('/v1/models');
+        } on LmStudioConnectionException catch (e) {
+          captured = e;
+        }
 
-      // The URI in the exception should reference the host/port used.
-      expect(captured?.uri.host, equals('127.0.0.1'));
-      expect(captured?.uri.port, equals(port));
-      client.dispose();
-    });
+        // The URI in the exception should reference the host/port used.
+        expect(captured?.uri.host, equals('127.0.0.1'));
+        expect(captured?.uri.port, equals(port));
+        client.dispose();
+      });
 
-    // NOTE: TimeoutException wrapping cannot be tested reliably with a real
-    // localhost server because `HttpClient.connectionTimeout` only covers the
-    // TCP handshake phase. On 127.0.0.1 the handshake completes in <1 ms
-    // regardless of the configured timeout.
-    //
-    // The `LmStudioConnectionException.timeout(...)` factory and the
-    // `isTimeout` getter are tested in the retry test suite
-    // (test/client/lm_studio_http_client_retry_test.dart) via an injectable
-    // `httpSend` parameter that can throw a `TimeoutException` directly.
-  });
+      // NOTE: TimeoutException wrapping cannot be tested reliably with a real
+      // localhost server because `HttpClient.connectionTimeout` only covers the
+      // TCP handshake phase. On 127.0.0.1 the handshake completes in <1 ms
+      // regardless of the configured timeout.
+      //
+      // The `LmStudioConnectionException.timeout(...)` factory and the
+      // `isTimeout` getter are tested in the retry test suite
+      // (test/client/lm_studio_http_client_retry_test.dart) via an injectable
+      // `httpSend` parameter that can throw a `TimeoutException` directly.
+    },
+  );
 
   // ───────────────────────────────────────────────────────────────────────────
   // 8. postStream — request construction
@@ -682,13 +719,15 @@ void main() {
       final server = await _CapturingServer.start(
         responseBody: {'object': 'text_completion'},
       );
-      final client =
-          LmStudioHttpClient(config: _config('http://127.0.0.1:${server.port}'));
+      final client = LmStudioHttpClient(
+        config: _config('http://127.0.0.1:${server.port}'),
+      );
 
       // postStream returns a Stream; consume it to ensure the request is sent.
-      await client
-          .postStream('/v1/completions', {'model': 'llama3', 'stream': true})
-          .toList();
+      await client.postStream('/v1/completions', {
+        'model': 'llama3',
+        'stream': true,
+      }).toList();
 
       expect(server.last.method, equals('POST'));
 
@@ -698,15 +737,14 @@ void main() {
 
     test('sends to the correct path', () async {
       final server = await _CapturingServer.start();
-      final client =
-          LmStudioHttpClient(config: _config('http://127.0.0.1:${server.port}'));
+      final client = LmStudioHttpClient(
+        config: _config('http://127.0.0.1:${server.port}'),
+      );
 
-      await client
-          .postStream(
-            '/v1/completions',
-            {'model': 'llama3', 'stream': true},
-          )
-          .toList();
+      await client.postStream('/v1/completions', {
+        'model': 'llama3',
+        'stream': true,
+      }).toList();
 
       expect(server.last.path, equals('/v1/completions'));
 
@@ -719,13 +757,12 @@ void main() {
         statusCode: 500,
         responseBody: {'error': 'server error'},
       );
-      final client =
-          LmStudioHttpClient(config: _config('http://127.0.0.1:${server.port}'));
+      final client = LmStudioHttpClient(
+        config: _config('http://127.0.0.1:${server.port}'),
+      );
 
       await expectLater(
-        () => client
-            .postStream('/v1/completions', {'stream': true})
-            .toList(),
+        () => client.postStream('/v1/completions', {'stream': true}).toList(),
         throwsA(isA<LmStudioApiException>()),
       );
 
@@ -733,17 +770,21 @@ void main() {
       await server.close();
     });
 
-    test('postStream on refused port throws LmStudioConnectionException',
-        () async {
-      final port = await _closedPort();
-      final client = LmStudioHttpClient(config: _config('http://127.0.0.1:$port'));
+    test(
+      'postStream on refused port throws LmStudioConnectionException',
+      () async {
+        final port = await _closedPort();
+        final client = LmStudioHttpClient(
+          config: _config('http://127.0.0.1:$port'),
+        );
 
-      await expectLater(
-        () => client.postStream('/v1/completions', {'stream': true}).toList(),
-        throwsA(isA<LmStudioConnectionException>()),
-      );
-      client.dispose();
-    });
+        await expectLater(
+          () => client.postStream('/v1/completions', {'stream': true}).toList(),
+          throwsA(isA<LmStudioConnectionException>()),
+        );
+        client.dispose();
+      },
+    );
   });
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -774,12 +815,16 @@ void main() {
 
       for (final path in paths) {
         final server = await _CapturingServer.start();
-        final client =
-            LmStudioHttpClient(config: _config('http://127.0.0.1:${server.port}'));
+        final client = LmStudioHttpClient(
+          config: _config('http://127.0.0.1:${server.port}'),
+        );
 
         await client.get(path);
-        expect(server.last.path, equals(path),
-            reason: 'Expected path $path to be sent');
+        expect(
+          server.last.path,
+          equals(path),
+          reason: 'Expected path $path to be sent',
+        );
 
         client.dispose();
         await server.close();

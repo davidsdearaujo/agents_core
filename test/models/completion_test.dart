@@ -46,19 +46,30 @@ void main() {
     });
 
     test('accepts temperature = 0.0', () {
-      final req = CompletionRequest(model: 'model', prompt: 'hi', temperature: 0.0);
+      final req = CompletionRequest(
+        model: 'model',
+        prompt: 'hi',
+        temperature: 0.0,
+      );
       expect(req.temperature, equals(0.0));
     });
 
     test('accepts temperature = 2.0 (max)', () {
-      final req = CompletionRequest(model: 'model', prompt: 'hi', temperature: 2.0);
+      final req = CompletionRequest(
+        model: 'model',
+        prompt: 'hi',
+        temperature: 2.0,
+      );
       expect(req.temperature, equals(2.0));
     });
   });
 
   group('CompletionRequest — toJson()', () {
     test('serializes required fields', () {
-      final req = CompletionRequest(model: 'test-model', prompt: 'Complete this');
+      final req = CompletionRequest(
+        model: 'test-model',
+        prompt: 'Complete this',
+      );
       final json = req.toJson();
       expect(json['model'], equals('test-model'));
       expect(json['prompt'], equals('Complete this'));
@@ -72,14 +83,22 @@ void main() {
     });
 
     test('maxTokens serialized as max_tokens (snake_case)', () {
-      final req = CompletionRequest(model: 'model', prompt: 'test', maxTokens: 64);
+      final req = CompletionRequest(
+        model: 'model',
+        prompt: 'test',
+        maxTokens: 64,
+      );
       final json = req.toJson();
       expect(json['max_tokens'], equals(64));
       expect(json.containsKey('maxTokens'), isFalse);
     });
 
     test('temperature serialized correctly', () {
-      final req = CompletionRequest(model: 'model', prompt: 'test', temperature: 0.5);
+      final req = CompletionRequest(
+        model: 'model',
+        prompt: 'test',
+        temperature: 0.5,
+      );
       final json = req.toJson();
       expect(json['temperature'], equals(0.5));
     });
@@ -145,7 +164,10 @@ void main() {
 
   group('CompletionRequest — round-trip', () {
     test('round-trips required fields', () {
-      final original = CompletionRequest(model: 'round-trip-model', prompt: 'Hello!');
+      final original = CompletionRequest(
+        model: 'round-trip-model',
+        prompt: 'Hello!',
+      );
       final restored = CompletionRequest.fromJson(original.toJson());
       expect(restored.model, equals(original.model));
       expect(restored.prompt, equals(original.prompt));
@@ -172,18 +194,27 @@ void main() {
 
   group('CompletionChoice — construction', () {
     test('creates with text and finishReason', () {
-      final choice = CompletionChoice(text: 'jumped over the lazy dog', finishReason: 'stop');
+      final choice = CompletionChoice(
+        text: 'jumped over the lazy dog',
+        finishReason: 'stop',
+      );
       expect(choice.text, equals('jumped over the lazy dog'));
       expect(choice.finishReason, equals('stop'));
     });
 
     test('finishReason can be null', () {
-      final choice = CompletionChoice(text: 'partial output', finishReason: null);
+      final choice = CompletionChoice(
+        text: 'partial output',
+        finishReason: null,
+      );
       expect(choice.finishReason, isNull);
     });
 
     test('finishReason can be length', () {
-      final choice = CompletionChoice(text: 'truncated', finishReason: 'length');
+      final choice = CompletionChoice(
+        text: 'truncated',
+        finishReason: 'length',
+      );
       expect(choice.finishReason, equals('length'));
     });
   });
@@ -242,11 +273,7 @@ void main() {
       'id': id,
       'object': 'text_completion',
       'choices': [
-        {
-          'index': 0,
-          'text': text,
-          'finish_reason': finishReason,
-        },
+        {'index': 0, 'text': text, 'finish_reason': finishReason},
       ],
       'usage': {
         'prompt_tokens': promptTokens,
@@ -259,8 +286,16 @@ void main() {
   group('CompletionResponse — construction', () {
     test('creates with id, choices, and usage', () {
       final choice = CompletionChoice(text: 'result', finishReason: 'stop');
-      final usage = CompletionUsage(promptTokens: 5, completionTokens: 3, totalTokens: 8);
-      final response = CompletionResponse(id: 'cmpl-xyz', choices: [choice], usage: usage);
+      final usage = CompletionUsage(
+        promptTokens: 5,
+        completionTokens: 3,
+        totalTokens: 8,
+      );
+      final response = CompletionResponse(
+        id: 'cmpl-xyz',
+        choices: [choice],
+        usage: usage,
+      );
       expect(response.id, equals('cmpl-xyz'));
       expect(response.choices.length, equals(1));
       expect(response.usage.totalTokens, equals(8));
@@ -271,8 +306,16 @@ void main() {
         CompletionChoice(text: 'option A', finishReason: 'stop'),
         CompletionChoice(text: 'option B', finishReason: 'stop'),
       ];
-      final usage = CompletionUsage(promptTokens: 5, completionTokens: 10, totalTokens: 15);
-      final response = CompletionResponse(id: 'cmpl-multi', choices: choices, usage: usage);
+      final usage = CompletionUsage(
+        promptTokens: 5,
+        completionTokens: 10,
+        totalTokens: 15,
+      );
+      final response = CompletionResponse(
+        id: 'cmpl-multi',
+        choices: choices,
+        usage: usage,
+      );
       expect(response.choices.length, equals(2));
     });
   });
@@ -349,9 +392,15 @@ void main() {
       expect(restored.id, equals(original.id));
       expect(restored.choices.length, equals(original.choices.length));
       expect(restored.choices[0].text, equals(original.choices[0].text));
-      expect(restored.choices[0].finishReason, equals(original.choices[0].finishReason));
+      expect(
+        restored.choices[0].finishReason,
+        equals(original.choices[0].finishReason),
+      );
       expect(restored.usage.promptTokens, equals(original.usage.promptTokens));
-      expect(restored.usage.completionTokens, equals(original.usage.completionTokens));
+      expect(
+        restored.usage.completionTokens,
+        equals(original.usage.completionTokens),
+      );
       expect(restored.usage.totalTokens, equals(original.usage.totalTokens));
     });
   });

@@ -5,98 +5,11 @@ import 'dart:io';
 import 'package:agents_core/agents_core.dart';
 import 'package:test/test.dart';
 
+import '../helpers/fake_agents.dart';
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/// Queue-based [Agent] fake that supports multiple sequential calls.
-///
-/// Each call returns the next result from [results] (cycling on wrap-around).
-/// If [errors] are provided, throws the error at the matching call index.
-class _FakeAgent extends Agent {
-  _FakeAgent({
-    super.name = 'fake',
-    List<AgentResult>? results,
-    List<Object>? errors,
-  })  : _results = results ?? const [],
-        _errors = errors ?? const [],
-        super(
-          client: LmStudioClient(
-            AgentsCoreConfig(logger: const SilentLogger()),
-          ),
-          config: AgentsCoreConfig(logger: const SilentLogger()),
-        );
-
-  /// Convenience: always return one fixed result regardless of call count.
-  _FakeAgent.single({
-    String name = 'fake',
-    AgentResult result = const AgentResult(output: 'fake output'),
-  }) : this(name: name, results: [result]);
-
-  /// Convenience: throw [error] on the first call.
-  _FakeAgent.throwing({String name = 'fake', required Object error})
-      : this(name: name, errors: [error]);
-
-  final List<AgentResult> _results;
-  final List<Object> _errors;
-
-  final List<String> capturedTasks = [];
-  final List<FileContext?> capturedContexts = [];
-  int callCount = 0;
-
-  @override
-  Future<AgentResult> run(String task, {FileContext? context}) async {
-    final index = callCount;
-    callCount++;
-    capturedTasks.add(task);
-    capturedContexts.add(context);
-
-    if (_errors.isNotEmpty && index < _errors.length) {
-      throw _errors[index];
-    }
-
-    if (_results.isNotEmpty) {
-      return _results[index % _results.length];
-    }
-    return const AgentResult(output: 'fake output');
-  }
-}
-
-/// An [Agent] that writes a named file to the shared [FileContext] when it runs.
-///
-/// Models agents (e.g. the triager) whose primary artefact is a workspace file
-/// rather than a plain text output.
-class _WritingFakeAgent extends Agent {
-  _WritingFakeAgent({
-    super.name = 'writing-fake',
-    required this.fileName,
-    required this.fileContent,
-    AgentResult? result,
-  })  : _result = result ?? AgentResult(output: fileContent),
-        super(
-          client: LmStudioClient(
-            AgentsCoreConfig(logger: const SilentLogger()),
-          ),
-          config: AgentsCoreConfig(logger: const SilentLogger()),
-        );
-
-  final String fileName;
-  final String fileContent;
-  final AgentResult _result;
-
-  String? capturedTask;
-  FileContext? capturedContext;
-  int callCount = 0;
-
-  @override
-  Future<AgentResult> run(String task, {FileContext? context}) async {
-    callCount++;
-    capturedTask = task;
-    capturedContext = context;
-    context?.write(fileName, fileContent);
-    return _result;
-  }
-}
 
 /// Creates a [FileContext] backed by a temporary directory.
 ({FileContext ctx, Directory dir}) _tempContext() {
@@ -143,11 +56,12 @@ Orchestrator _buildBugfixPipeline({
     steps: [
       // ── Step 1: Triage ──────────────────────────────────────────────────
       //
-      // The triager is a _WritingFakeAgent that auto-writes triage.md to the
+      // The triager is a WritingFakeAgent that auto-writes triage.md to the
       // shared workspace, simulating an agent that saves its structured output.
       AgentStep(
         agent: triager,
-        taskPrompt: 'Triage the following bug report and provide a '
+        taskPrompt:
+            'Triage the following bug report and provide a '
             'structured analysis with severity, affected components, and '
             'recommended next steps.',
       ),
@@ -162,7 +76,8 @@ Orchestrator _buildBugfixPipeline({
       AgentLoopStep(
         producer: investigator,
         reviewer: seniorEngineer,
-        taskPrompt: 'Investigate the root cause of the bug and propose a '
+        taskPrompt:
+            'Investigate the root cause of the bug and propose a '
             'detailed hypothesis with evidence.',
         maxIterations: 3,
 
@@ -207,8 +122,9 @@ Orchestrator _buildBugfixPipeline({
 
         // Dynamic producer prompt: injects triage and root cause context.
         buildProducerPrompt: (task, prodCtx, i, prev) async {
-          final triage =
-              prodCtx.exists('triage.md') ? prodCtx.read('triage.md') : '';
+          final triage = prodCtx.exists('triage.md')
+              ? prodCtx.read('triage.md')
+              : '';
           final rootCause = prodCtx.exists('root_cause.md')
               ? prodCtx.read('root_cause.md')
               : '';
@@ -242,7 +158,8 @@ Orchestrator _buildBugfixPipeline({
       // ── Step 4: Regression Tests (conditional) ──────────────────────────
       AgentStep(
         agent: testWriter,
-        taskPrompt: 'Write regression tests that verify the bug is fixed '
+        taskPrompt:
+            'Write regression tests that verify the bug is fixed '
             'and guard against regressions.',
         condition: (condCtx) async => condCtx.exists('root_cause.md'),
       ),
@@ -250,7 +167,8 @@ Orchestrator _buildBugfixPipeline({
       // ── Step 5: PR Summary (conditional) ────────────────────────────────
       AgentStep(
         agent: prWriter,
-        taskPrompt: 'Write a pull request description summarising the bug, '
+        taskPrompt:
+            'Write a pull request description summarising the bug, '
             'root cause, fix, and tests added.',
         condition: (condCtx) async => condCtx.exists('root_cause.md'),
       ),
@@ -278,139 +196,144 @@ void main() {
     // ── 1. Full happy path ──────────────────────────────────────────────────
 
     test(
-        'full happy path: all 5 steps execute with correct types and results',
-        () async {
-      // Step 1: triager writes triage.md and returns a summary.
-      final triager = _WritingFakeAgent(
-        name: 'triager',
-        fileName: 'triage.md',
-        fileContent: 'Severity: HIGH — NullPointerException in UserService',
-        result: const AgentResult(
-          output: 'Triage complete: HIGH severity, affects UserService',
-          tokensUsed: 10,
-        ),
-      );
-
-      // Step 2: investigator proposes root cause; senior engineer confirms on
-      // first try → iterationCount == 1, accepted == true.
-      final investigator = _FakeAgent.single(
-        name: 'investigator',
-        result: const AgentResult(
-          output: 'Root cause: userRepository was not initialized',
-          tokensUsed: 20,
-        ),
-      );
-      final seniorEngineer = _FakeAgent.single(
-        name: 'senior-engineer',
-        result: const AgentResult(
-          output: 'CONFIRMED — the root cause is correct',
-          tokensUsed: 10,
-        ),
-      );
-
-      // Step 3: developer writes fix; reviewer rejects once then approves →
-      // iterationCount == 2, accepted == true.
-      final developer = _FakeAgent(
-        name: 'developer',
-        results: [
-          const AgentResult(
-            output: 'fix v1 — adds null guard but forgets to init',
-            tokensUsed: 30,
-          ),
-          const AgentResult(
-            output: 'fix v2 — initializes repo in constructor',
-            tokensUsed: 30,
-          ),
-        ],
-      );
-      final fixReviewer = _FakeAgent(
-        name: 'fix-reviewer',
-        results: [
-          const AgentResult(
-            output: 'REJECTED — missing initialization in constructor',
+      'full happy path: all 5 steps execute with correct types and results',
+      () async {
+        // Step 1: triager writes triage.md and returns a summary.
+        final triager = WritingFakeAgent(
+          name: 'triager',
+          fileName: 'triage.md',
+          fileContent: 'Severity: HIGH — NullPointerException in UserService',
+          result: const AgentResult(
+            output: 'Triage complete: HIGH severity, affects UserService',
             tokensUsed: 10,
           ),
-          const AgentResult(
-            output: 'APPROVED — fix is complete and correct',
+        );
+
+        // Step 2: investigator proposes root cause; senior engineer confirms on
+        // first try → iterationCount == 1, accepted == true.
+        final investigator = FakeAgent.single(
+          name: 'investigator',
+          result: const AgentResult(
+            output: 'Root cause: userRepository was not initialized',
+            tokensUsed: 20,
+          ),
+        );
+        final seniorEngineer = FakeAgent.single(
+          name: 'senior-engineer',
+          result: const AgentResult(
+            output: 'CONFIRMED — the root cause is correct',
             tokensUsed: 10,
           ),
-        ],
-      );
+        );
 
-      // Steps 4 and 5: simple single-result agents.
-      final testWriter = _FakeAgent.single(
-        name: 'test-writer',
-        result: const AgentResult(
-          output: 'Regression test: testUserServiceLoginNoNPE()',
-          tokensUsed: 15,
-        ),
-      );
-      final prWriter = _FakeAgent.single(
-        name: 'pr-writer',
-        result: const AgentResult(
-          output: 'PR: Fix NPE in UserService.login() — closes #42',
-          tokensUsed: 10,
-        ),
-      );
+        // Step 3: developer writes fix; reviewer rejects once then approves →
+        // iterationCount == 2, accepted == true.
+        final developer = FakeAgent(
+          name: 'developer',
+          results: [
+            const AgentResult(
+              output: 'fix v1 — adds null guard but forgets to init',
+              tokensUsed: 30,
+            ),
+            const AgentResult(
+              output: 'fix v2 — initializes repo in constructor',
+              tokensUsed: 30,
+            ),
+          ],
+        );
+        final fixReviewer = FakeAgent(
+          name: 'fix-reviewer',
+          results: [
+            const AgentResult(
+              output: 'REJECTED — missing initialization in constructor',
+              tokensUsed: 10,
+            ),
+            const AgentResult(
+              output: 'APPROVED — fix is complete and correct',
+              tokensUsed: 10,
+            ),
+          ],
+        );
 
-      final orch = _buildBugfixPipeline(
-        ctx: ctx,
-        triager: triager,
-        investigator: investigator,
-        seniorEngineer: seniorEngineer,
-        developer: developer,
-        fixReviewer: fixReviewer,
-        testWriter: testWriter,
-        prWriter: prWriter,
-      );
+        // Steps 4 and 5: simple single-result agents.
+        final testWriter = FakeAgent.single(
+          name: 'test-writer',
+          result: const AgentResult(
+            output: 'Regression test: testUserServiceLoginNoNPE()',
+            tokensUsed: 15,
+          ),
+        );
+        final prWriter = FakeAgent.single(
+          name: 'pr-writer',
+          result: const AgentResult(
+            output: 'PR: Fix NPE in UserService.login() — closes #42',
+            tokensUsed: 10,
+          ),
+        );
 
-      final result = await orch.run();
+        final orch = _buildBugfixPipeline(
+          ctx: ctx,
+          triager: triager,
+          investigator: investigator,
+          seniorEngineer: seniorEngineer,
+          developer: developer,
+          fixReviewer: fixReviewer,
+          testWriter: testWriter,
+          prWriter: prWriter,
+        );
 
-      // All 5 steps must have executed.
-      expect(result.stepResults, hasLength(5));
+        final result = await orch.run();
 
-      // Correct StepResult subtypes at each index.
-      expect(result.stepResults[0], isA<AgentStepResult>());
-      expect(result.stepResults[1], isA<AgentLoopStepResult>());
-      expect(result.stepResults[2], isA<AgentLoopStepResult>());
-      expect(result.stepResults[3], isA<AgentStepResult>());
-      expect(result.stepResults[4], isA<AgentStepResult>());
+        // All 5 steps must have executed.
+        expect(result.stepResults, hasLength(5));
 
-      // Step 1: triage output.
-      expect(result.stepResults[0].output,
-          'Triage complete: HIGH severity, affects UserService');
+        // Correct StepResult subtypes at each index.
+        expect(result.stepResults[0], isA<AgentStepResult>());
+        expect(result.stepResults[1], isA<AgentLoopStepResult>());
+        expect(result.stepResults[2], isA<AgentLoopStepResult>());
+        expect(result.stepResults[3], isA<AgentStepResult>());
+        expect(result.stepResults[4], isA<AgentStepResult>());
 
-      // Step 2: confirmed on first iteration.
-      final step2 = result.stepResults[1] as AgentLoopStepResult;
-      expect(step2.accepted, isTrue);
-      expect(step2.iterationCount, 1);
+        // Step 1: triage output.
+        expect(
+          result.stepResults[0].output,
+          'Triage complete: HIGH severity, affects UserService',
+        );
 
-      // Step 3: approved on second iteration.
-      final step3 = result.stepResults[2] as AgentLoopStepResult;
-      expect(step3.accepted, isTrue);
-      expect(step3.iterationCount, 2);
-      expect(step3.output, 'fix v2 — initializes repo in constructor');
+        // Step 2: confirmed on first iteration.
+        final step2 = result.stepResults[1] as AgentLoopStepResult;
+        expect(step2.accepted, isTrue);
+        expect(step2.iterationCount, 1);
 
-      // Step 4: regression tests.
-      expect(result.stepResults[3].output,
-          'Regression test: testUserServiceLoginNoNPE()');
+        // Step 3: approved on second iteration.
+        final step3 = result.stepResults[2] as AgentLoopStepResult;
+        expect(step3.accepted, isTrue);
+        expect(step3.iterationCount, 2);
+        expect(step3.output, 'fix v2 — initializes repo in constructor');
 
-      // Step 5: PR summary.
-      expect(result.stepResults[4].output,
-          'PR: Fix NPE in UserService.login() — closes #42');
+        // Step 4: regression tests.
+        expect(
+          result.stepResults[3].output,
+          'Regression test: testUserServiceLoginNoNPE()',
+        );
 
-      // No errors.
-      expect(result.hasErrors, isFalse);
-      expect(result.errors, isEmpty);
-    });
+        // Step 5: PR summary.
+        expect(
+          result.stepResults[4].output,
+          'PR: Fix NPE in UserService.login() — closes #42',
+        );
+
+        // No errors.
+        expect(result.hasErrors, isFalse);
+        expect(result.errors, isEmpty);
+      },
+    );
 
     // ── 2. Root cause rejected then confirmed ───────────────────────────────
 
-    test(
-        'root cause: first hypothesis rejected, second confirmed — '
-        'iterationCount == 2, accepted == true',
-        () async {
-      final triager = _WritingFakeAgent(
+    test('root cause: first hypothesis rejected, second confirmed — '
+        'iterationCount == 2, accepted == true', () async {
+      final triager = WritingFakeAgent(
         name: 'triager',
         fileName: 'triage.md',
         fileContent: 'Bug: NPE in auth module on login',
@@ -418,7 +341,7 @@ void main() {
       );
 
       // Investigator proposes two different hypotheses across two iterations.
-      final investigator = _FakeAgent(
+      final investigator = FakeAgent(
         name: 'investigator',
         results: [
           const AgentResult(output: 'Hypothesis 1: wrong config path'),
@@ -426,7 +349,7 @@ void main() {
         ],
       );
       // Senior engineer rejects first, confirms second.
-      final seniorEngineer = _FakeAgent(
+      final seniorEngineer = FakeAgent(
         name: 'senior-engineer',
         results: [
           const AgentResult(
@@ -438,16 +361,16 @@ void main() {
         ],
       );
 
-      final developer = _FakeAgent.single(
+      final developer = FakeAgent.single(
         name: 'developer',
         result: const AgentResult(output: 'fix implementation'),
       );
-      final fixReviewer = _FakeAgent.single(
+      final fixReviewer = FakeAgent.single(
         name: 'fix-reviewer',
         result: const AgentResult(output: 'APPROVED — fix is correct'),
       );
-      final testWriter = _FakeAgent.single(name: 'test-writer');
-      final prWriter = _FakeAgent.single(name: 'pr-writer');
+      final testWriter = FakeAgent.single(name: 'test-writer');
+      final prWriter = FakeAgent.single(name: 'pr-writer');
 
       final orch = _buildBugfixPipeline(
         ctx: ctx,
@@ -481,11 +404,9 @@ void main() {
 
     // ── 3. Fix rejected then approved ───────────────────────────────────────
 
-    test(
-        'fix: developer rejected on iteration 1, approved on iteration 2 — '
-        'iterationCount == 2, accepted == true',
-        () async {
-      final triager = _WritingFakeAgent(
+    test('fix: developer rejected on iteration 1, approved on iteration 2 — '
+        'iterationCount == 2, accepted == true', () async {
+      final triager = WritingFakeAgent(
         name: 'triager',
         fileName: 'triage.md',
         fileContent: 'Bug: memory leak in connection pool',
@@ -493,24 +414,24 @@ void main() {
       );
 
       // Root cause confirmed on first try.
-      final investigator = _FakeAgent.single(
+      final investigator = FakeAgent.single(
         name: 'investigator',
         result: const AgentResult(output: 'Connections not closed in finally'),
       );
-      final seniorEngineer = _FakeAgent.single(
+      final seniorEngineer = FakeAgent.single(
         name: 'senior-engineer',
         result: const AgentResult(output: 'CONFIRMED — connections not closed'),
       );
 
       // Developer submits two fix attempts; reviewer rejects first, approves second.
-      final developer = _FakeAgent(
+      final developer = FakeAgent(
         name: 'developer',
         results: [
           const AgentResult(output: 'fix attempt 1 — closes in catch only'),
           const AgentResult(output: 'fix attempt 2 — closes in finally block'),
         ],
       );
-      final fixReviewer = _FakeAgent(
+      final fixReviewer = FakeAgent(
         name: 'fix-reviewer',
         results: [
           const AgentResult(output: 'REJECTED — missing null check in close()'),
@@ -518,8 +439,8 @@ void main() {
         ],
       );
 
-      final testWriter = _FakeAgent.single(name: 'test-writer');
-      final prWriter = _FakeAgent.single(name: 'pr-writer');
+      final testWriter = FakeAgent.single(name: 'test-writer');
+      final prWriter = FakeAgent.single(name: 'pr-writer');
 
       final orch = _buildBugfixPipeline(
         ctx: ctx,
@@ -550,11 +471,9 @@ void main() {
 
     // ── 4. Root cause fails → Steps 3–5 skipped ────────────────────────────
 
-    test(
-        'root cause not confirmed at maxIterations: steps 3-5 skipped, '
-        'stepResults.length == 2, accepted == false',
-        () async {
-      final triager = _WritingFakeAgent(
+    test('root cause not confirmed at maxIterations: steps 3-5 skipped, '
+        'stepResults.length == 2, accepted == false', () async {
+      final triager = WritingFakeAgent(
         name: 'triager',
         fileName: 'triage.md',
         fileContent: 'Bug: timeout on heavy queries',
@@ -565,7 +484,7 @@ void main() {
       );
 
       // Investigator makes 3 proposals; none are confirmed.
-      final investigator = _FakeAgent(
+      final investigator = FakeAgent(
         name: 'investigator',
         results: [
           const AgentResult(output: 'Hypothesis 1: slow index'),
@@ -574,7 +493,7 @@ void main() {
         ],
       );
       // Senior engineer never returns "CONFIRMED".
-      final seniorEngineer = _FakeAgent(
+      final seniorEngineer = FakeAgent(
         name: 'senior-engineer',
         results: [
           const AgentResult(output: 'NOT CONFIRMED — keep looking'),
@@ -583,10 +502,10 @@ void main() {
         ],
       );
 
-      final developer = _FakeAgent.single(name: 'developer');
-      final fixReviewer = _FakeAgent.single(name: 'fix-reviewer');
-      final testWriter = _FakeAgent.single(name: 'test-writer');
-      final prWriter = _FakeAgent.single(name: 'pr-writer');
+      final developer = FakeAgent.single(name: 'developer');
+      final fixReviewer = FakeAgent.single(name: 'fix-reviewer');
+      final testWriter = FakeAgent.single(name: 'test-writer');
+      final prWriter = FakeAgent.single(name: 'pr-writer');
 
       final orch = _buildBugfixPipeline(
         ctx: ctx,
@@ -606,8 +525,10 @@ void main() {
 
       // Step 1: triage result.
       expect(result.stepResults[0], isA<AgentStepResult>());
-      expect(result.stepResults[0].output,
-          'Triage complete: MEDIUM severity timeout issue');
+      expect(
+        result.stepResults[0].output,
+        'Triage complete: MEDIUM severity timeout issue',
+      );
 
       // Step 2: loop ended without acceptance.
       final step2 = result.stepResults[1] as AgentLoopStepResult;
@@ -629,11 +550,9 @@ void main() {
 
     // ── 5. continueOnError — Step 2 throws ─────────────────────────────────
 
-    test(
-        'continueOnError: step 2 throws — error captured, steps 3-5 skipped, '
-        'stepResults.length == 1',
-        () async {
-      final triager = _WritingFakeAgent(
+    test('continueOnError: step 2 throws — error captured, steps 3-5 skipped, '
+        'stepResults.length == 1', () async {
+      final triager = WritingFakeAgent(
         name: 'triager',
         fileName: 'triage.md',
         fileContent: 'Bug: crash on startup',
@@ -641,16 +560,16 @@ void main() {
       );
 
       // Investigator crashes on its first call.
-      final investigator = _FakeAgent.throwing(
+      final investigator = FakeAgent.throwing(
         name: 'investigator',
         error: Exception('investigator service unavailable'),
       );
-      final seniorEngineer = _FakeAgent.single(name: 'senior-engineer');
+      final seniorEngineer = FakeAgent.single(name: 'senior-engineer');
 
-      final developer = _FakeAgent.single(name: 'developer');
-      final fixReviewer = _FakeAgent.single(name: 'fix-reviewer');
-      final testWriter = _FakeAgent.single(name: 'test-writer');
-      final prWriter = _FakeAgent.single(name: 'pr-writer');
+      final developer = FakeAgent.single(name: 'developer');
+      final fixReviewer = FakeAgent.single(name: 'fix-reviewer');
+      final testWriter = FakeAgent.single(name: 'test-writer');
+      final prWriter = FakeAgent.single(name: 'pr-writer');
 
       final orch = _buildBugfixPipeline(
         ctx: ctx,
@@ -688,76 +607,77 @@ void main() {
     // ── 6. Dynamic prompt reads from FileContext ────────────────────────────
 
     test(
-        'step 3 developer prompt contains content from triage.md and root_cause.md',
-        () async {
-      // Use distinguishable content strings to confirm both files appear in
-      // the developer's captured task.
-      const triageContent =
-          'NullPointerException in UserService.login() at line 42';
-      const rootCauseContent =
-          'Root cause: userRepository was not initialized before first use';
+      'step 3 developer prompt contains content from triage.md and root_cause.md',
+      () async {
+        // Use distinguishable content strings to confirm both files appear in
+        // the developer's captured task.
+        const triageContent =
+            'NullPointerException in UserService.login() at line 42';
+        const rootCauseContent =
+            'Root cause: userRepository was not initialized before first use';
 
-      final triager = _WritingFakeAgent(
-        name: 'triager',
-        fileName: 'triage.md',
-        fileContent: triageContent,
-        result: const AgentResult(output: 'Triage written to context'),
-      );
+        final triager = WritingFakeAgent(
+          name: 'triager',
+          fileName: 'triage.md',
+          fileContent: triageContent,
+          result: const AgentResult(output: 'Triage written to context'),
+        );
 
-      // Investigator output becomes root_cause.md content on confirmation.
-      final investigator = _FakeAgent.single(
-        name: 'investigator',
-        result: AgentResult(output: rootCauseContent),
-      );
-      final seniorEngineer = _FakeAgent.single(
-        name: 'senior-engineer',
-        result: const AgentResult(
-          output: 'CONFIRMED — root cause validated by senior engineer',
-        ),
-      );
+        // Investigator output becomes root_cause.md content on confirmation.
+        final investigator = FakeAgent.single(
+          name: 'investigator',
+          result: AgentResult(output: rootCauseContent),
+        );
+        final seniorEngineer = FakeAgent.single(
+          name: 'senior-engineer',
+          result: const AgentResult(
+            output: 'CONFIRMED — root cause validated by senior engineer',
+          ),
+        );
 
-      // Developer: approve immediately so we can inspect its captured prompt.
-      final developer = _FakeAgent.single(
-        name: 'developer',
-        result: const AgentResult(output: 'fix implementation'),
-      );
-      final fixReviewer = _FakeAgent.single(
-        name: 'fix-reviewer',
-        result: const AgentResult(output: 'APPROVED — fix is complete'),
-      );
+        // Developer: approve immediately so we can inspect its captured prompt.
+        final developer = FakeAgent.single(
+          name: 'developer',
+          result: const AgentResult(output: 'fix implementation'),
+        );
+        final fixReviewer = FakeAgent.single(
+          name: 'fix-reviewer',
+          result: const AgentResult(output: 'APPROVED — fix is complete'),
+        );
 
-      final testWriter = _FakeAgent.single(name: 'test-writer');
-      final prWriter = _FakeAgent.single(name: 'pr-writer');
+        final testWriter = FakeAgent.single(name: 'test-writer');
+        final prWriter = FakeAgent.single(name: 'pr-writer');
 
-      final orch = _buildBugfixPipeline(
-        ctx: ctx,
-        triager: triager,
-        investigator: investigator,
-        seniorEngineer: seniorEngineer,
-        developer: developer,
-        fixReviewer: fixReviewer,
-        testWriter: testWriter,
-        prWriter: prWriter,
-      );
+        final orch = _buildBugfixPipeline(
+          ctx: ctx,
+          triager: triager,
+          investigator: investigator,
+          seniorEngineer: seniorEngineer,
+          developer: developer,
+          fixReviewer: fixReviewer,
+          testWriter: testWriter,
+          prWriter: prWriter,
+        );
 
-      await orch.run();
+        await orch.run();
 
-      // Developer must have been called exactly once.
-      expect(developer.capturedTasks, hasLength(1));
+        // Developer must have been called exactly once.
+        expect(developer.capturedTasks, hasLength(1));
 
-      final developerPrompt = developer.capturedTasks.first;
+        final developerPrompt = developer.capturedTasks.first;
 
-      // The prompt must embed content from both workspace files.
-      expect(
-        developerPrompt,
-        contains(triageContent),
-        reason: 'prompt should include triage.md content',
-      );
-      expect(
-        developerPrompt,
-        contains(rootCauseContent),
-        reason: 'prompt should include root_cause.md content',
-      );
-    });
+        // The prompt must embed content from both workspace files.
+        expect(
+          developerPrompt,
+          contains(triageContent),
+          reason: 'prompt should include triage.md content',
+        );
+        expect(
+          developerPrompt,
+          contains(rootCauseContent),
+          reason: 'prompt should include root_cause.md content',
+        );
+      },
+    );
   });
 }

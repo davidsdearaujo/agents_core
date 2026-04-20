@@ -31,8 +31,7 @@ Future<void> main() async {
   );
 
   // Shared workspace — both agents can read/write files here.
-  final workspacePath =
-      '${Directory.systemTemp.path}/agents_core_example_loop';
+  final workspacePath = '${Directory.systemTemp.path}/agents_core_example_loop';
   final context = FileContext(workspacePath: workspacePath);
 
   print('Shared workspace: ${context.workspacePath}\n');
@@ -46,7 +45,8 @@ Future<void> main() async {
       client: client,
       config: config,
       model: 'llama-3-8b',
-      systemPrompt: 'You are a senior Dart developer. '
+      systemPrompt:
+          'You are a senior Dart developer. '
           'Write clean, idiomatic Dart code with doc comments. '
           'When given review feedback, revise your code to address every '
           'issue raised by the reviewer.',
@@ -58,7 +58,8 @@ Future<void> main() async {
       client: client,
       config: config,
       model: 'llama-3-8b',
-      systemPrompt: 'You are a strict code reviewer for Dart projects. '
+      systemPrompt:
+          'You are a strict code reviewer for Dart projects. '
           'Evaluate the code for correctness, edge-case handling, '
           'documentation, and idiomatic style. '
           'If the code meets all criteria, begin your response with '
@@ -72,10 +73,9 @@ Future<void> main() async {
       reviewer: qa,
       // Accept when the reviewer's output starts with "APPROVED".
       isAccepted: (AgentResult reviewerResult, int iteration) {
-        return reviewerResult.output
-            .trim()
-            .toUpperCase()
-            .startsWith('APPROVED');
+        return reviewerResult.output.trim().toUpperCase().startsWith(
+          'APPROVED',
+        );
       },
       // Allow up to 4 produce-review rounds before giving up.
       maxIterations: 4,

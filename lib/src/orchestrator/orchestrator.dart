@@ -2,9 +2,9 @@
 
 import '../agent/agent.dart';
 import '../context/file_context.dart';
-import 'agent_loop.dart';
 import 'orchestrator_step.dart';
 import 'step_result.dart';
+import 'task_prompt.dart';
 
 /// Policy that controls how the [Orchestrator] handles step failures.
 ///
@@ -46,11 +46,8 @@ class AgentStep extends OrchestratorStep {
   /// [taskPrompt] is the literal prompt string passed to [Agent.run].
   /// [condition] is an optional guard; when it returns `false` the step
   /// is skipped.
-  const AgentStep({
-    required this.agent,
-    required String taskPrompt,
-    this.condition,
-  }) : taskPrompt = taskPrompt;
+  AgentStep({required this.agent, required String taskPrompt, this.condition})
+    : taskPrompt = StaticPrompt(taskPrompt);
 
   /// Creates an [AgentStep] with a dynamic task prompt that is resolved
   /// at runtime.
@@ -61,19 +58,19 @@ class AgentStep extends OrchestratorStep {
   ///
   /// [condition] is an optional guard; when it returns `false` the step
   /// is skipped.
-  const AgentStep.dynamic({
+  AgentStep.dynamic({
     required this.agent,
     required Future<String> Function(FileContext) taskPrompt,
     this.condition,
-  }) : taskPrompt = taskPrompt;
+  }) : taskPrompt = DynamicPrompt(taskPrompt);
 
   /// The agent that executes this step.
   final Agent agent;
 
-  /// The task prompt — either a [String] or a
-  /// `Future<String> Function(FileContext)` that is awaited at runtime.
+  /// The task prompt — either a [StaticPrompt] (compile-time string) or a
+  /// [DynamicPrompt] (resolved at runtime from the [FileContext]).
   @override
-  final Object taskPrompt;
+  final TaskPrompt taskPrompt;
 
   /// An optional guard condition evaluated before the step runs.
   ///
@@ -81,6 +78,14 @@ class AgentStep extends OrchestratorStep {
   /// skipped if the function returns `false`.
   @override
   final Future<bool> Function(FileContext)? condition;
+
+  /// Runs [agent] with [resolvedPrompt] and wraps the result in an
+  /// [AgentStepResult].
+  @override
+  Future<StepResult> execute(FileContext context, String resolvedPrompt) async {
+    final result = await agent.run(resolvedPrompt, context: context);
+    return AgentStepResult(agentResult: result);
+  }
 }
 
 /// The result of an [Orchestrator.run] invocation.
@@ -129,9 +134,9 @@ class OrchestratorResult {
 /// Sequences execution through a pipeline of [OrchestratorStep]s.
 ///
 /// The [Orchestrator] iterates through [steps] in order, evaluating each
-/// step's optional [OrchestratorStep.condition], resolving dynamic prompts,
-/// and collecting results. Steps can be [AgentStep]s (single agent) or
-/// [AgentLoopStep]s (produce-review loops).
+/// step's optional [OrchestratorStep.condition], resolving dynamic prompts
+/// via an exhaustive switch on [TaskPrompt], then dispatching to each step's
+/// [OrchestratorStep.execute] method polymorphically.
 ///
 /// Error handling is controlled by [onError]:
 /// - [OrchestratorErrorPolicy.stop] (default) — rethrow on first failure.
@@ -184,12 +189,11 @@ class Orchestrator {
   /// For each step:
   /// 1. If [OrchestratorStep.condition] is non-null, await it; skip the step
   ///    when it returns `false`.
-  /// 2. Resolve the task prompt — use as-is for [String], or await the
-  ///    function for dynamic prompts.
-  /// 3. Execute the step based on its concrete type:
-  ///    - [AgentStep]: call [Agent.run] and wrap in [AgentStepResult].
-  ///    - [AgentLoopStep]: create an [AgentLoop], call its `run`, and wrap
-  ///      in [AgentLoopStepResult].
+  /// 2. Resolve the task prompt via an exhaustive switch on [TaskPrompt] —
+  ///    [StaticPrompt] is used directly; [DynamicPrompt] is awaited with the
+  ///    shared [context].
+  /// 3. Dispatch to [OrchestratorStep.execute] polymorphically — no
+  ///    type-switches. Custom step types work without modifying this class.
   /// 4. On success, add the [StepResult] to `stepResults`.
   /// 5. On failure, either rethrow ([OrchestratorErrorPolicy.stop]) or
   ///    capture the error and continue
@@ -209,35 +213,17 @@ class Orchestrator {
         if (!shouldRun) continue;
       }
 
-      // 2. Resolve the task prompt.
-      final String resolvedPrompt;
-      final prompt = step.taskPrompt;
-      if (prompt is String) {
-        resolvedPrompt = prompt;
-      } else {
-        resolvedPrompt =
-            await (prompt as Future<String> Function(FileContext))(context);
-      }
+      // 2. Resolve the task prompt via exhaustive switch — no runtime casts.
+      final resolvedPrompt = switch (step.taskPrompt) {
+        StaticPrompt(:final value) => value,
+        DynamicPrompt(:final resolver) => await resolver(context),
+      };
 
-      // 3. Execute based on step type.
+      // 3. Execute the step polymorphically — open to extension without
+      //    modification (Open/Closed Principle).
       try {
-        if (step is AgentStep) {
-          final result =
-              await step.agent.run(resolvedPrompt, context: context);
-          stepResults.add(AgentStepResult(agentResult: result));
-        } else if (step is AgentLoopStep) {
-          final loop = AgentLoop(
-            context: context,
-            producer: step.producer,
-            reviewer: step.reviewer,
-            isAccepted: step.isAccepted,
-            maxIterations: step.maxIterations,
-            buildProducerPrompt: step.buildProducerPrompt,
-            buildReviewerPrompt: step.buildReviewerPrompt,
-          );
-          final result = await loop.run(resolvedPrompt);
-          stepResults.add(AgentLoopStepResult(agentLoopResult: result));
-        }
+        final result = await step.execute(context, resolvedPrompt);
+        stepResults.add(result);
       } catch (e) {
         if (onError == OrchestratorErrorPolicy.stop) rethrow;
         errors.add(e);

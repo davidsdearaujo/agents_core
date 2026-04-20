@@ -44,11 +44,11 @@ String? _headerValue(RecordedRequest req, String headerName) {
 
 /// A minimal chat-completion request body.
 Map<String, dynamic> _chatBody({String model = 'llama3'}) => {
-      'model': model,
-      'messages': [
-        {'role': 'user', 'content': 'Hello'},
-      ],
-    };
+  'model': model,
+  'messages': [
+    {'role': 'user', 'content': 'Hello'},
+  ],
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Tests
@@ -106,9 +106,7 @@ void main() {
         path: '/v1/models',
         response: MockResponse.json(body: {'data': []}),
       );
-      final client = LmStudioHttpClient(
-        config: _cfg(server, apiKey: apiKey),
-      );
+      final client = LmStudioHttpClient(config: _cfg(server, apiKey: apiKey));
 
       await client.get('/v1/models');
 
@@ -117,23 +115,21 @@ void main() {
       client.dispose();
     });
 
-    test('Authorization header format is "Bearer <key>" with single space',
-        () async {
-      const apiKey = 'sk-test-1234';
-      server.enqueue(
-        response: MockResponse.json(body: {'ok': true}),
-      );
-      final client = LmStudioHttpClient(
-        config: _cfg(server, apiKey: apiKey),
-      );
+    test(
+      'Authorization header format is "Bearer <key>" with single space',
+      () async {
+        const apiKey = 'sk-test-1234';
+        server.enqueue(response: MockResponse.json(body: {'ok': true}));
+        final client = LmStudioHttpClient(config: _cfg(server, apiKey: apiKey));
 
-      await client.get('/v1/models');
+        await client.get('/v1/models');
 
-      final authHeader = _headerValue(server.requests.first, 'authorization');
-      // Verify exact format: "Bearer" + space + key, nothing extra
-      expect(authHeader, equals('Bearer sk-test-1234'));
-      client.dispose();
-    });
+        final authHeader = _headerValue(server.requests.first, 'authorization');
+        // Verify exact format: "Bearer" + space + key, nothing extra
+        expect(authHeader, equals('Bearer sk-test-1234'));
+        client.dispose();
+      },
+    );
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -158,17 +154,14 @@ void main() {
       client.dispose();
     });
 
-    test('Authorization header contains exact Bearer token for POST',
-        () async {
+    test('Authorization header contains exact Bearer token for POST', () async {
       const apiKey = 'lm-post-key-xyz789';
       server.enqueue(
         method: 'POST',
         path: '/v1/chat/completions',
         response: MockResponse.json(body: {'id': 'cmpl-1', 'choices': []}),
       );
-      final client = LmStudioHttpClient(
-        config: _cfg(server, apiKey: apiKey),
-      );
+      final client = LmStudioHttpClient(config: _cfg(server, apiKey: apiKey));
 
       await client.post('/v1/chat/completions', _chatBody());
 
@@ -190,9 +183,7 @@ void main() {
           path: '/v1/chat/completions',
           response: MockResponse.json(body: {'id': 'cmpl-1', 'choices': []}),
         );
-      final client = LmStudioHttpClient(
-        config: _cfg(server, apiKey: apiKey),
-      );
+      final client = LmStudioHttpClient(config: _cfg(server, apiKey: apiKey));
 
       await client.get('/v1/models');
       await client.post('/v1/chat/completions', _chatBody());
@@ -209,68 +200,80 @@ void main() {
   // ─────────────────────────────────────────────────────────────────────────────
   // 3. postStream requests — api_key is transmitted as Authorization header
   // ─────────────────────────────────────────────────────────────────────────────
-  group('postStream requests — api_key transmitted as Authorization header',
-      () {
-    test('Authorization header is present for SSE streaming requests',
+  group(
+    'postStream requests — api_key transmitted as Authorization header',
+    () {
+      test(
+        'Authorization header is present for SSE streaming requests',
         () async {
-      const apiKey = 'stream-key-456';
-      server.enqueue(
-        method: 'POST',
-        path: '/v1/chat/completions',
-        response: MockResponse.sse(chunks: [
-          {
-            'choices': [
-              {
-                'delta': {'content': 'Hi'},
-              },
-            ],
-          },
-        ]),
-      );
-      final client = LmStudioHttpClient(
-        config: _cfg(server, apiKey: apiKey),
-      );
+          const apiKey = 'stream-key-456';
+          server.enqueue(
+            method: 'POST',
+            path: '/v1/chat/completions',
+            response: MockResponse.sse(
+              chunks: [
+                {
+                  'choices': [
+                    {
+                      'delta': {'content': 'Hi'},
+                    },
+                  ],
+                },
+              ],
+            ),
+          );
+          final client = LmStudioHttpClient(
+            config: _cfg(server, apiKey: apiKey),
+          );
 
-      await client
-          .postStream('/v1/chat/completions', {..._chatBody(), 'stream': true})
-          .toList();
+          await client.postStream('/v1/chat/completions', {
+            ..._chatBody(),
+            'stream': true,
+          }).toList();
 
-      expect(server.requests, hasLength(1));
-      final authHeader = _headerValue(server.requests.first, 'authorization');
-      expect(authHeader, equals('Bearer $apiKey'));
-      client.dispose();
-    });
-
-    test('postStream sends same api_key format as POST', () async {
-      const apiKey = 'consistent-key-789';
-      // First: regular POST
-      server.enqueue(
-        method: 'POST',
-        path: '/v1/chat/completions',
-        response: MockResponse.json(body: {'id': 'cmpl-1', 'choices': []}),
-      );
-      // Second: SSE POST
-      server.enqueue(
-        method: 'POST',
-        path: '/v1/chat/completions',
-        response: MockResponse.sse(chunks: []),
-      );
-      final client = LmStudioHttpClient(
-        config: _cfg(server, apiKey: apiKey),
+          expect(server.requests, hasLength(1));
+          final authHeader = _headerValue(
+            server.requests.first,
+            'authorization',
+          );
+          expect(authHeader, equals('Bearer $apiKey'));
+          client.dispose();
+        },
       );
 
-      await client.post('/v1/chat/completions', _chatBody());
-      await client
-          .postStream('/v1/chat/completions', {..._chatBody(), 'stream': true})
-          .toList();
+      test('postStream sends same api_key format as POST', () async {
+        const apiKey = 'consistent-key-789';
+        // First: regular POST
+        server.enqueue(
+          method: 'POST',
+          path: '/v1/chat/completions',
+          response: MockResponse.json(body: {'id': 'cmpl-1', 'choices': []}),
+        );
+        // Second: SSE POST
+        server.enqueue(
+          method: 'POST',
+          path: '/v1/chat/completions',
+          response: MockResponse.sse(chunks: []),
+        );
+        final client = LmStudioHttpClient(config: _cfg(server, apiKey: apiKey));
 
-      final postAuth = _headerValue(server.requests[0], 'authorization');
-      final streamAuth = _headerValue(server.requests[1], 'authorization');
-      expect(postAuth, equals(streamAuth),
-          reason: 'Regular POST and postStream should send identical auth');
-      client.dispose();
-    });
-  });
+        await client.post('/v1/chat/completions', _chatBody());
+        await client.postStream('/v1/chat/completions', {
+          ..._chatBody(),
+          'stream': true,
+        }).toList();
+
+        final postAuth = _headerValue(server.requests[0], 'authorization');
+        final streamAuth = _headerValue(server.requests[1], 'authorization');
+        expect(
+          postAuth,
+          equals(streamAuth),
+          reason: 'Regular POST and postStream should send identical auth',
+        );
+        client.dispose();
+      });
+    },
+  );
 
   // ─────────────────────────────────────────────────────────────────────────────
   // 4. No api_key configured (null) — no Authorization header sent
@@ -282,15 +285,16 @@ void main() {
         path: '/v1/models',
         response: MockResponse.json(body: {'data': []}),
       );
-      final client = LmStudioHttpClient(
-        config: _cfg(server, apiKey: null),
-      );
+      final client = LmStudioHttpClient(config: _cfg(server, apiKey: null));
 
       await client.get('/v1/models');
 
       final authHeader = _headerValue(server.requests.first, 'authorization');
-      expect(authHeader, isNull,
-          reason: 'No Authorization header when apiKey is null');
+      expect(
+        authHeader,
+        isNull,
+        reason: 'No Authorization header when apiKey is null',
+      );
       client.dispose();
     });
 
@@ -300,92 +304,91 @@ void main() {
         path: '/v1/chat/completions',
         response: MockResponse.json(body: {'id': 'cmpl-1', 'choices': []}),
       );
-      final client = LmStudioHttpClient(
-        config: _cfg(server),
-      );
+      final client = LmStudioHttpClient(config: _cfg(server));
 
       await client.post('/v1/chat/completions', _chatBody());
 
       final authHeader = _headerValue(server.requests.first, 'authorization');
-      expect(authHeader, isNull,
-          reason: 'No Authorization header when apiKey is null');
+      expect(
+        authHeader,
+        isNull,
+        reason: 'No Authorization header when apiKey is null',
+      );
       client.dispose();
     });
 
-    test('postStream sends no Authorization header when apiKey is null',
-        () async {
-      server.enqueue(
-        method: 'POST',
-        path: '/v1/chat/completions',
-        response: MockResponse.sse(chunks: []),
-      );
-      final client = LmStudioHttpClient(
-        config: _cfg(server),
-      );
+    test(
+      'postStream sends no Authorization header when apiKey is null',
+      () async {
+        server.enqueue(
+          method: 'POST',
+          path: '/v1/chat/completions',
+          response: MockResponse.sse(chunks: []),
+        );
+        final client = LmStudioHttpClient(config: _cfg(server));
 
-      await client
-          .postStream('/v1/chat/completions', {..._chatBody(), 'stream': true})
-          .toList();
+        await client.postStream('/v1/chat/completions', {
+          ..._chatBody(),
+          'stream': true,
+        }).toList();
 
-      final authHeader = _headerValue(server.requests.first, 'authorization');
-      expect(authHeader, isNull,
-          reason: 'No Authorization header when apiKey is null');
-      client.dispose();
-    });
+        final authHeader = _headerValue(server.requests.first, 'authorization');
+        expect(
+          authHeader,
+          isNull,
+          reason: 'No Authorization header when apiKey is null',
+        );
+        client.dispose();
+      },
+    );
 
-    test('default AgentsCoreConfig (no apiKey) sends no Authorization header',
-        () async {
-      server.enqueue(
-        response: MockResponse.json(body: {'ok': true}),
-      );
-      // Default config — apiKey is null
-      final client = LmStudioHttpClient(
-        config: AgentsCoreConfig(
-          lmStudioBaseUrl: Uri.parse(server.baseUrl),
-          logger: const SilentLogger(),
-        ),
-      );
+    test(
+      'default AgentsCoreConfig (no apiKey) sends no Authorization header',
+      () async {
+        server.enqueue(response: MockResponse.json(body: {'ok': true}));
+        // Default config — apiKey is null
+        final client = LmStudioHttpClient(
+          config: AgentsCoreConfig(
+            lmStudioBaseUrl: Uri.parse(server.baseUrl),
+            logger: const SilentLogger(),
+          ),
+        );
 
-      await client.get('/v1/models');
+        await client.get('/v1/models');
 
-      final authHeader = _headerValue(server.requests.first, 'authorization');
-      expect(authHeader, isNull);
-      client.dispose();
-    });
+        final authHeader = _headerValue(server.requests.first, 'authorization');
+        expect(authHeader, isNull);
+        client.dispose();
+      },
+    );
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
   // 5. api_key format edge cases
   // ─────────────────────────────────────────────────────────────────────────────
   group('api_key format edge cases', () {
-    test('empty string apiKey sends Authorization header with empty bearer',
-        () async {
-      server.enqueue(
-        response: MockResponse.json(body: {'ok': true}),
-      );
-      final client = LmStudioHttpClient(
-        config: _cfg(server, apiKey: ''),
-      );
+    test(
+      'empty string apiKey sends Authorization header with empty bearer',
+      () async {
+        server.enqueue(response: MockResponse.json(body: {'ok': true}));
+        final client = LmStudioHttpClient(config: _cfg(server, apiKey: ''));
 
-      await client.get('/v1/models');
+        await client.get('/v1/models');
 
-      final authHeader = _headerValue(server.requests.first, 'authorization');
-      // Empty string is non-null, so the header IS sent.
-      // HTTP header serialisation trims trailing whitespace, so
-      // "Bearer " becomes "Bearer".
-      expect(authHeader, isNotNull);
-      expect(authHeader, startsWith('Bearer'));
-      client.dispose();
-    });
+        final authHeader = _headerValue(server.requests.first, 'authorization');
+        // Empty string is non-null, so the header IS sent.
+        // HTTP header serialisation trims trailing whitespace, so
+        // "Bearer " becomes "Bearer".
+        expect(authHeader, isNotNull);
+        expect(authHeader, startsWith('Bearer'));
+        client.dispose();
+      },
+    );
 
     test('apiKey with special characters is transmitted verbatim', () async {
       const apiKey = 'sk-abc_123.def+ghi/jkl=mno!@#\$%^&*';
-      server.enqueue(
-        response: MockResponse.json(body: {'ok': true}),
-      );
-      final client = LmStudioHttpClient(
-        config: _cfg(server, apiKey: apiKey),
-      );
+      server.enqueue(response: MockResponse.json(body: {'ok': true}));
+      final client = LmStudioHttpClient(config: _cfg(server, apiKey: apiKey));
 
       await client.get('/v1/models');
 
@@ -396,12 +399,8 @@ void main() {
 
     test('long apiKey (255 chars) is transmitted in full', () async {
       final apiKey = 'sk-${'a' * 252}'; // 3 + 252 = 255 chars
-      server.enqueue(
-        response: MockResponse.json(body: {'ok': true}),
-      );
-      final client = LmStudioHttpClient(
-        config: _cfg(server, apiKey: apiKey),
-      );
+      server.enqueue(response: MockResponse.json(body: {'ok': true}));
+      final client = LmStudioHttpClient(config: _cfg(server, apiKey: apiKey));
 
       await client.get('/v1/models');
 
@@ -412,31 +411,25 @@ void main() {
       client.dispose();
     });
 
-    test('apiKey with dashes (OpenAI-style sk-xxx) is sent correctly',
-        () async {
-      const apiKey = 'sk-proj-abc123def456ghi789jkl012mno345';
-      server.enqueue(
-        response: MockResponse.json(body: {'ok': true}),
-      );
-      final client = LmStudioHttpClient(
-        config: _cfg(server, apiKey: apiKey),
-      );
+    test(
+      'apiKey with dashes (OpenAI-style sk-xxx) is sent correctly',
+      () async {
+        const apiKey = 'sk-proj-abc123def456ghi789jkl012mno345';
+        server.enqueue(response: MockResponse.json(body: {'ok': true}));
+        final client = LmStudioHttpClient(config: _cfg(server, apiKey: apiKey));
 
-      await client.get('/v1/models');
+        await client.get('/v1/models');
 
-      final authHeader = _headerValue(server.requests.first, 'authorization');
-      expect(authHeader, equals('Bearer $apiKey'));
-      client.dispose();
-    });
+        final authHeader = _headerValue(server.requests.first, 'authorization');
+        expect(authHeader, equals('Bearer $apiKey'));
+        client.dispose();
+      },
+    );
 
     test('apiKey with spaces is transmitted as-is', () async {
       const apiKey = 'key with spaces';
-      server.enqueue(
-        response: MockResponse.json(body: {'ok': true}),
-      );
-      final client = LmStudioHttpClient(
-        config: _cfg(server, apiKey: apiKey),
-      );
+      server.enqueue(response: MockResponse.json(body: {'ok': true}));
+      final client = LmStudioHttpClient(config: _cfg(server, apiKey: apiKey));
 
       await client.get('/v1/models');
 
@@ -452,9 +445,7 @@ void main() {
   group('api_key from AgentsCoreConfig.fromEnvironment', () {
     test('AGENTS_API_KEY env var is sent in Authorization header', () async {
       const envKey = 'env-api-key-from-environment';
-      server.enqueue(
-        response: MockResponse.json(body: {'ok': true}),
-      );
+      server.enqueue(response: MockResponse.json(body: {'ok': true}));
       final config = AgentsCoreConfig.fromEnvironment(
         environment: {
           'LM_STUDIO_BASE_URL': server.baseUrl,
@@ -471,27 +462,30 @@ void main() {
       client.dispose();
     });
 
-    test('missing AGENTS_API_KEY env var sends no Authorization header',
-        () async {
-      server.enqueue(
-        response: MockResponse.json(body: {'ok': true}),
-      );
-      final config = AgentsCoreConfig.fromEnvironment(
-        environment: {
-          'LM_STUDIO_BASE_URL': server.baseUrl,
-          // No AGENTS_API_KEY
-        },
-        logger: const SilentLogger(),
-      );
-      final client = LmStudioHttpClient(config: config);
+    test(
+      'missing AGENTS_API_KEY env var sends no Authorization header',
+      () async {
+        server.enqueue(response: MockResponse.json(body: {'ok': true}));
+        final config = AgentsCoreConfig.fromEnvironment(
+          environment: {
+            'LM_STUDIO_BASE_URL': server.baseUrl,
+            // No AGENTS_API_KEY
+          },
+          logger: const SilentLogger(),
+        );
+        final client = LmStudioHttpClient(config: config);
 
-      await client.get('/v1/models');
+        await client.get('/v1/models');
 
-      final authHeader = _headerValue(server.requests.first, 'authorization');
-      expect(authHeader, isNull,
-          reason: 'Missing AGENTS_API_KEY means no auth');
-      client.dispose();
-    });
+        final authHeader = _headerValue(server.requests.first, 'authorization');
+        expect(
+          authHeader,
+          isNull,
+          reason: 'Missing AGENTS_API_KEY means no auth',
+        );
+        client.dispose();
+      },
+    );
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -542,8 +536,11 @@ void main() {
       final auth1 = _headerValue(server.requests[0], 'authorization');
       final auth2 = _headerValue(server.requests[1], 'authorization');
       expect(auth1, equals('Bearer will-be-removed'));
-      expect(auth2, isNull,
-          reason: 'After clearApiKey, no Authorization header');
+      expect(
+        auth2,
+        isNull,
+        reason: 'After clearApiKey, no Authorization header',
+      );
       client1.dispose();
       client2.dispose();
     });
@@ -553,17 +550,15 @@ void main() {
   // 8. api_key sent on every request — consistency across multiple calls
   // ─────────────────────────────────────────────────────────────────────────────
   group('api_key consistent across multiple requests', () {
-    test('same api_key is sent in every request via the same client',
-        () async {
+    test('same api_key is sent in every request via the same client', () async {
       const apiKey = 'persistent-key';
       server
         ..enqueue(response: MockResponse.json(body: {'data': []}))
         ..enqueue(
-            response: MockResponse.json(body: {'id': 'c1', 'choices': []}))
+          response: MockResponse.json(body: {'id': 'c1', 'choices': []}),
+        )
         ..enqueue(response: MockResponse.json(body: {'data': []}));
-      final client = LmStudioHttpClient(
-        config: _cfg(server, apiKey: apiKey),
-      );
+      final client = LmStudioHttpClient(config: _cfg(server, apiKey: apiKey));
 
       await client.get('/v1/models');
       await client.post('/v1/chat/completions', _chatBody());
@@ -572,8 +567,11 @@ void main() {
       expect(server.requests, hasLength(3));
       for (var i = 0; i < 3; i++) {
         final auth = _headerValue(server.requests[i], 'authorization');
-        expect(auth, equals('Bearer $apiKey'),
-            reason: 'Request #$i should carry the same Bearer token');
+        expect(
+          auth,
+          equals('Bearer $apiKey'),
+          reason: 'Request #$i should carry the same Bearer token',
+        );
       }
       client.dispose();
     });
@@ -585,9 +583,7 @@ void main() {
         path: '/v1/chat/completions',
         response: MockResponse.json(body: {'id': 'c1', 'choices': []}),
       );
-      final client = LmStudioHttpClient(
-        config: _cfg(server, apiKey: apiKey),
-      );
+      final client = LmStudioHttpClient(config: _cfg(server, apiKey: apiKey));
 
       await client.post('/v1/chat/completions', _chatBody());
 
@@ -605,43 +601,41 @@ void main() {
   // 9. api_key with baseUrl string constructor
   // ─────────────────────────────────────────────────────────────────────────────
   group('api_key with baseUrl string constructor', () {
-    test('apiKey from config is sent even when using baseUrl shorthand',
-        () async {
-      const apiKey = 'baseurl-constructor-key';
-      server.enqueue(
-        response: MockResponse.json(body: {'ok': true}),
-      );
-      // Use the baseUrl + config combo — config carries the apiKey
-      final client = LmStudioHttpClient(
-        config: AgentsCoreConfig(
-          lmStudioBaseUrl: Uri.parse(server.baseUrl),
-          apiKey: apiKey,
-          logger: const SilentLogger(),
-        ),
-      );
+    test(
+      'apiKey from config is sent even when using baseUrl shorthand',
+      () async {
+        const apiKey = 'baseurl-constructor-key';
+        server.enqueue(response: MockResponse.json(body: {'ok': true}));
+        // Use the baseUrl + config combo — config carries the apiKey
+        final client = LmStudioHttpClient(
+          config: AgentsCoreConfig(
+            lmStudioBaseUrl: Uri.parse(server.baseUrl),
+            apiKey: apiKey,
+            logger: const SilentLogger(),
+          ),
+        );
 
-      await client.get('/v1/models');
+        await client.get('/v1/models');
 
-      final authHeader = _headerValue(server.requests.first, 'authorization');
-      expect(authHeader, equals('Bearer $apiKey'));
-      client.dispose();
-    });
+        final authHeader = _headerValue(server.requests.first, 'authorization');
+        expect(authHeader, equals('Bearer $apiKey'));
+        client.dispose();
+      },
+    );
 
-    test('no apiKey in config means no Authorization with baseUrl constructor',
-        () async {
-      server.enqueue(
-        response: MockResponse.json(body: {'ok': true}),
-      );
-      final client = LmStudioHttpClient(
-        baseUrl: server.baseUrl,
-      );
+    test(
+      'no apiKey in config means no Authorization with baseUrl constructor',
+      () async {
+        server.enqueue(response: MockResponse.json(body: {'ok': true}));
+        final client = LmStudioHttpClient(baseUrl: server.baseUrl);
 
-      await client.get('/v1/models');
+        await client.get('/v1/models');
 
-      final authHeader = _headerValue(server.requests.first, 'authorization');
-      expect(authHeader, isNull);
-      client.dispose();
-    });
+        final authHeader = _headerValue(server.requests.first, 'authorization');
+        expect(authHeader, isNull);
+        client.dispose();
+      },
+    );
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -649,58 +643,58 @@ void main() {
   //     returns an error
   // ─────────────────────────────────────────────────────────────────────────────
   group('api_key sent on error responses', () {
-    test('Authorization header is present even when server returns 401',
-        () async {
-      const apiKey = 'bad-key-but-still-sent';
-      server.enqueue(
-        response: MockResponse.error(
-          statusCode: 401,
-          body: {
-            'error': {'type': 'unauthorized', 'message': 'Invalid API key'},
-          },
-        ),
-      );
-      final client = LmStudioHttpClient(
-        config: _cfg(server, apiKey: apiKey),
-      );
+    test(
+      'Authorization header is present even when server returns 401',
+      () async {
+        const apiKey = 'bad-key-but-still-sent';
+        server.enqueue(
+          response: MockResponse.error(
+            statusCode: 401,
+            body: {
+              'error': {'type': 'unauthorized', 'message': 'Invalid API key'},
+            },
+          ),
+        );
+        final client = LmStudioHttpClient(config: _cfg(server, apiKey: apiKey));
 
-      try {
-        await client.get('/v1/models');
-      } on LmStudioApiException {
-        // Expected — the server returned 401
-      }
+        try {
+          await client.get('/v1/models');
+        } on LmStudioApiException {
+          // Expected — the server returned 401
+        }
 
-      // Even though the server rejected the key, verify it was SENT
-      expect(server.requests, hasLength(1));
-      final authHeader = _headerValue(server.requests.first, 'authorization');
-      expect(authHeader, equals('Bearer $apiKey'));
-      client.dispose();
-    });
+        // Even though the server rejected the key, verify it was SENT
+        expect(server.requests, hasLength(1));
+        final authHeader = _headerValue(server.requests.first, 'authorization');
+        expect(authHeader, equals('Bearer $apiKey'));
+        client.dispose();
+      },
+    );
 
-    test('Authorization header is present even when server returns 403',
-        () async {
-      const apiKey = 'forbidden-key';
-      server.enqueue(
-        response: MockResponse.error(
-          statusCode: 403,
-          body: {
-            'error': {'type': 'forbidden', 'message': 'Access denied'},
-          },
-        ),
-      );
-      final client = LmStudioHttpClient(
-        config: _cfg(server, apiKey: apiKey),
-      );
+    test(
+      'Authorization header is present even when server returns 403',
+      () async {
+        const apiKey = 'forbidden-key';
+        server.enqueue(
+          response: MockResponse.error(
+            statusCode: 403,
+            body: {
+              'error': {'type': 'forbidden', 'message': 'Access denied'},
+            },
+          ),
+        );
+        final client = LmStudioHttpClient(config: _cfg(server, apiKey: apiKey));
 
-      try {
-        await client.post('/v1/chat/completions', _chatBody());
-      } on LmStudioApiException {
-        // Expected
-      }
+        try {
+          await client.post('/v1/chat/completions', _chatBody());
+        } on LmStudioApiException {
+          // Expected
+        }
 
-      final authHeader = _headerValue(server.requests.first, 'authorization');
-      expect(authHeader, equals('Bearer $apiKey'));
-      client.dispose();
-    });
+        final authHeader = _headerValue(server.requests.first, 'authorization');
+        expect(authHeader, equals('Bearer $apiKey'));
+        client.dispose();
+      },
+    );
   });
 }

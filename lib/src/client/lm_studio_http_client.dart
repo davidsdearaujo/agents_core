@@ -2,8 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:meta/meta.dart';
+
 import '../config/agents_core_config.dart';
+import '../config/lm_studio_config.dart';
 import '../exceptions/lm_studio_exceptions.dart';
+import '../utils/disposable.dart';
 
 /// HTTP client for communicating with an LM Studio server.
 ///
@@ -36,12 +40,18 @@ import '../exceptions/lm_studio_exceptions.dart';
 /// ```dart
 /// final client = LmStudioHttpClient(baseUrl: 'http://localhost:1234');
 /// ```
-class LmStudioHttpClient {
+class LmStudioHttpClient with Disposable {
   /// Creates an [LmStudioHttpClient].
   ///
-  /// Accepts an optional [config] for full control, or a [baseUrl] string
-  /// for convenience. When [baseUrl] is provided and [config] is omitted,
-  /// a default [AgentsCoreConfig] is created using the parsed URL.
+  /// Accepts an optional [lmStudioConfig] for LM Studio-specific settings,
+  /// a legacy [config] for full control, or a [baseUrl] string for
+  /// convenience.
+  ///
+  /// Priority order when multiple parameters are supplied:
+  /// 1. [lmStudioConfig] — preferred; takes precedence over [config] and
+  ///    [baseUrl].
+  /// 2. [config] — full [AgentsCoreConfig]; used when no [lmStudioConfig].
+  /// 3. [baseUrl] — shorthand; creates a default config with the given URL.
   ///
   /// [maxRetries] controls how many times a failed request is retried
   /// (default 3). Set to 0 to disable retries entirely.
@@ -56,6 +66,7 @@ class LmStudioHttpClient {
   /// The underlying [HttpClient] connection timeout is set to
   /// [AgentsCoreConfig.requestTimeout].
   LmStudioHttpClient({
+    LmStudioConfig? lmStudioConfig,
     AgentsCoreConfig? config,
     String? baseUrl,
     int maxRetries = 3,
@@ -66,11 +77,17 @@ class LmStudioHttpClient {
     })?
     httpSend,
     Future<void> Function(Duration)? delay,
-  }) : _config =
-           config ??
-           AgentsCoreConfig(
-             lmStudioBaseUrl: baseUrl != null ? Uri.parse(baseUrl) : null,
-           ),
+  }) : _config = lmStudioConfig != null
+           ? AgentsCoreConfig(
+               lmStudioBaseUrl: lmStudioConfig.baseUrl,
+               defaultModel: lmStudioConfig.defaultModel,
+               requestTimeout: lmStudioConfig.requestTimeout,
+               apiKey: lmStudioConfig.apiKey,
+             )
+           : config ??
+                 AgentsCoreConfig(
+                   lmStudioBaseUrl: baseUrl != null ? Uri.parse(baseUrl) : null,
+                 ),
        _maxRetries = maxRetries,
        _httpSend = httpSend,
        _delayFn = delay ?? Future.delayed,
@@ -177,10 +194,14 @@ class LmStudioHttpClient {
   /// Closes the underlying [HttpClient] and frees its resources.
   ///
   /// After calling [dispose], no further requests can be made with
-  /// this instance.
+  /// this instance. Subsequent calls are a no-op.
+  @override
+  @mustCallSuper
   void dispose() {
+    if (isDisposed) return;
     _config.logger.debug('Disposing LmStudioHttpClient');
     _client.close();
+    super.dispose();
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────

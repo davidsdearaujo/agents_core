@@ -20,7 +20,7 @@ class FileContext {
   ///
   /// Throws [ArgumentError] if [workspacePath] is empty.
   FileContext({required String workspacePath})
-      : _root = Directory(workspacePath) {
+    : _root = Directory(workspacePath) {
     if (workspacePath.isEmpty) {
       throw ArgumentError.value(
         workspacePath,

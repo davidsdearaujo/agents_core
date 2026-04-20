@@ -124,16 +124,10 @@ class LmStudioConnectionException implements Exception {
       );
     }
     if (exception is HttpException) {
-      return LmStudioConnectionException.httpError(
-        uri: uri,
-        cause: exception,
-      );
+      return LmStudioConnectionException.httpError(uri: uri, cause: exception);
     }
     if (exception is TimeoutException) {
-      return LmStudioConnectionException.timeout(
-        uri: uri,
-        cause: exception,
-      );
+      return LmStudioConnectionException.timeout(uri: uri, cause: exception);
     }
     return LmStudioConnectionException(
       message: 'Failed to communicate with $uri: $exception',

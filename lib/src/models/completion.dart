@@ -54,10 +54,7 @@ class CompletionRequest {
   ///
   /// Optional fields are omitted when `null`. Keys use snake_case.
   Map<String, dynamic> toJson() {
-    final json = <String, dynamic>{
-      'model': model,
-      'prompt': prompt,
-    };
+    final json = <String, dynamic>{'model': model, 'prompt': prompt};
     if (maxTokens != null) json['max_tokens'] = maxTokens;
     if (temperature != null) json['temperature'] = temperature;
     if (stream != null) json['stream'] = stream;
@@ -91,9 +88,9 @@ class CompletionChoice {
 
   /// Serializes this choice to a JSON-compatible map.
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'text': text,
-        'finish_reason': finishReason,
-      };
+    'text': text,
+    'finish_reason': finishReason,
+  };
 }
 
 /// The response from `POST /v1/completions` (text completion).
@@ -121,8 +118,7 @@ class CompletionResponse {
       choices: rawChoices
           .map((c) => CompletionChoice.fromJson(c as Map<String, dynamic>))
           .toList(),
-      usage:
-          CompletionUsage.fromJson(json['usage'] as Map<String, dynamic>),
+      usage: CompletionUsage.fromJson(json['usage'] as Map<String, dynamic>),
     );
   }
 
@@ -137,8 +133,8 @@ class CompletionResponse {
 
   /// Serializes this response to a JSON-compatible map.
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'choices': choices.map((c) => c.toJson()).toList(),
-        'usage': usage.toJson(),
-      };
+    'id': id,
+    'choices': choices.map((c) => c.toJson()).toList(),
+    'usage': usage.toJson(),
+  };
 }

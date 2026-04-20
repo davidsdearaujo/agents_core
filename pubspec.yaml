@@ -3,15 +3,18 @@ description: >-
   A Dart library for orchestrating multi-agent AI workflows with
   LM Studio integration. Create agents, manage conversations, execute
   Python in Docker, and coordinate multi-step pipelines.
-version: 0.3.5
+version: 0.3.6
 repository: https://github.com/davidsdearaujo/agents_core
 
 environment:
-  sdk: ^3.10.9
+  sdk: ">=3.8.0 <4.0.0"
 
-# No runtime dependencies — agents_core relies only on dart:core,
+# Minimal dependencies — agents_core relies primarily on dart:core,
 # dart:io, dart:async, dart:convert, and dart:math.
-dependencies: {}
+# The meta package is analysis-only (zero runtime overhead) and provides
+# @mustCallSuper for the Disposable lifecycle mixin.
+dependencies:
+  meta: ">=1.15.0 <2.0.0"
 
 dev_dependencies:
   lints: ^6.0.0

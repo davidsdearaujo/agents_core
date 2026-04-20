@@ -39,20 +39,14 @@ void main() {
     });
 
     test('parses model without object field', () {
-      final json = <String, dynamic>{
-        'id': 'llama3',
-        'owned_by': 'user',
-      };
+      final json = <String, dynamic>{'id': 'llama3', 'owned_by': 'user'};
       final model = LmModel.fromJson(json);
       expect(model.id, equals('llama3'));
       expect(model.ownedBy, equals('user'));
     });
 
     test('parses empty ownedBy', () {
-      final json = <String, dynamic>{
-        'id': 'test-model',
-        'owned_by': '',
-      };
+      final json = <String, dynamic>{'id': 'test-model', 'owned_by': ''};
       final model = LmModel.fromJson(json);
       expect(model.ownedBy, equals(''));
     });
@@ -80,7 +74,10 @@ void main() {
 
   group('LmModel — round-trip', () {
     test('round-trips through toJson/fromJson', () {
-      final original = LmModel(id: 'lmstudio-community/mistral', ownedBy: 'community');
+      final original = LmModel(
+        id: 'lmstudio-community/mistral',
+        ownedBy: 'community',
+      );
       final restored = LmModel.fromJson(original.toJson());
       expect(restored.id, equals(original.id));
       expect(restored.ownedBy, equals(original.ownedBy));

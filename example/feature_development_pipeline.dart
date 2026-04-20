@@ -66,17 +66,15 @@ class PersistingAgent extends Agent {
   ///
   /// [delegate] is the wrapped agent that performs the actual work.
   /// [outputFile] is the workspace-relative path where output is saved.
-  PersistingAgent({
-    required this.delegate,
-    required this.outputFile,
-  }) : super(
-          name: delegate.name,
-          client: delegate.client,
-          config: delegate.config,
-          systemPrompt: delegate.systemPrompt,
-          tools: delegate.tools,
-          model: delegate.model,
-        );
+  PersistingAgent({required this.delegate, required this.outputFile})
+    : super(
+        name: delegate.name,
+        client: delegate.client,
+        config: delegate.config,
+        systemPrompt: delegate.systemPrompt,
+        tools: delegate.tools,
+        model: delegate.model,
+      );
 
   /// The wrapped agent that performs the actual work.
   final Agent delegate;
@@ -154,8 +152,9 @@ const _stageLabels = [
   SimpleAgent reviewer,
   Agent techWriter,
   Agent securityAuditor,
-}) _createAgents({
-  required LmStudioClient client,
+})
+_createAgents({
+  required LlmClient client,
   required AgentsCoreConfig config,
   required String model,
 }) {
@@ -165,7 +164,8 @@ const _stageLabels = [
     client: client,
     config: config,
     model: model,
-    systemPrompt: 'You are a senior product analyst. '
+    systemPrompt:
+        'You are a senior product analyst. '
         'Given a feature request, produce a structured requirements '
         'document with:\n'
         '- Functional requirements (numbered FR-001, FR-002, ...)\n'
@@ -181,7 +181,8 @@ const _stageLabels = [
     client: client,
     config: config,
     model: model,
-    systemPrompt: 'You are a senior software architect. '
+    systemPrompt:
+        'You are a senior software architect. '
         'Given requirements, produce a technical design document with:\n'
         '- High-level architecture (components, data flow)\n'
         '- API contract (endpoints, request/response schemas)\n'
@@ -196,7 +197,8 @@ const _stageLabels = [
     client: client,
     config: config,
     model: model,
-    systemPrompt: 'You are a senior Dart developer. '
+    systemPrompt:
+        'You are a senior Dart developer. '
         'Write clean, production-ready Dart code with:\n'
         '- Doc comments on all public APIs\n'
         '- Proper error handling\n'
@@ -211,7 +213,8 @@ const _stageLabels = [
     client: client,
     config: config,
     model: model,
-    systemPrompt: 'You are a strict code reviewer for Dart projects. '
+    systemPrompt:
+        'You are a strict code reviewer for Dart projects. '
         'Evaluate code against the design document and requirements. '
         'Check for:\n'
         '- Correctness and completeness\n'
@@ -229,7 +232,8 @@ const _stageLabels = [
     client: client,
     config: config,
     model: model,
-    systemPrompt: 'You are a technical documentation specialist. '
+    systemPrompt:
+        'You are a technical documentation specialist. '
         'Given source code and a design document, produce API '
         'documentation with:\n'
         '- Endpoint descriptions\n'
@@ -245,7 +249,8 @@ const _stageLabels = [
     client: client,
     config: config,
     model: model,
-    systemPrompt: 'You are an application security engineer. '
+    systemPrompt:
+        'You are an application security engineer. '
         'Review source code for vulnerabilities including:\n'
         '- Injection attacks (SQL, NoSQL, command)\n'
         '- Authentication/authorization flaws\n'
@@ -309,7 +314,8 @@ Orchestrator _buildPipeline({
       // The PersistingAgent wrapper auto-saves output to requirements.md.
       AgentStep(
         agent: analyst,
-        taskPrompt: 'Analyze the following feature request and produce a '
+        taskPrompt:
+            'Analyze the following feature request and produce a '
             'structured requirements document.\n\n$_featureRequest',
       ),
 
@@ -338,74 +344,78 @@ Orchestrator _buildPipeline({
       AgentLoopStep(
         producer: developer,
         reviewer: reviewer,
-        taskPrompt: 'Implement the authentication API endpoint in Dart '
+        taskPrompt:
+            'Implement the authentication API endpoint in Dart '
             'based on the design document and requirements.',
         maxIterations: 3,
 
         // Acceptance predicate: look for the APPROVED marker.
         isAccepted: (AgentResult reviewerResult, int iteration) {
-          return reviewerResult.output
-              .trim()
-              .toUpperCase()
-              .startsWith(_approvalMarker);
+          return reviewerResult.output.trim().toUpperCase().startsWith(
+            _approvalMarker,
+          );
         },
 
         // Custom producer prompt: full context + review feedback.
-        buildProducerPrompt: (
-          String originalTask,
-          FileContext ctx,
-          int iteration,
-          AgentResult? previousReview,
-        ) async {
-          final design = ctx.read(_designFile);
-          final requirements = ctx.read(_requirementsFile);
+        buildProducerPrompt:
+            (
+              String originalTask,
+              FileContext ctx,
+              int iteration,
+              AgentResult? previousReview,
+            ) async {
+              final design = ctx.read(_designFile);
+              final requirements = ctx.read(_requirementsFile);
 
-          final buffer = StringBuffer()
-            ..writeln(originalTask)
-            ..writeln()
-            ..writeln('## Design Document')
-            ..writeln()
-            ..writeln(design)
-            ..writeln()
-            ..writeln('## Requirements')
-            ..writeln()
-            ..writeln(requirements);
+              final buffer = StringBuffer()
+                ..writeln(originalTask)
+                ..writeln()
+                ..writeln('## Design Document')
+                ..writeln()
+                ..writeln(design)
+                ..writeln()
+                ..writeln('## Requirements')
+                ..writeln()
+                ..writeln(requirements);
 
-          // From iteration 1+, include the reviewer's feedback.
-          if (previousReview != null) {
-            buffer
-              ..writeln()
-              ..writeln('---')
-              ..writeln('## Review Feedback (iteration $iteration)')
-              ..writeln()
-              ..writeln(previousReview.output)
-              ..writeln()
-              ..writeln('Address every issue above and produce the revised '
-                  'implementation.');
-          }
+              // From iteration 1+, include the reviewer's feedback.
+              if (previousReview != null) {
+                buffer
+                  ..writeln()
+                  ..writeln('---')
+                  ..writeln('## Review Feedback (iteration $iteration)')
+                  ..writeln()
+                  ..writeln(previousReview.output)
+                  ..writeln()
+                  ..writeln(
+                    'Address every issue above and produce the revised '
+                    'implementation.',
+                  );
+              }
 
-          return buffer.toString();
-        },
+              return buffer.toString();
+            },
 
         // Custom reviewer prompt: requirements + design + code.
-        buildReviewerPrompt: (
-          String originalTask,
-          FileContext ctx,
-          int iteration,
-          AgentResult producerResult,
-        ) async {
-          final design = ctx.read(_designFile);
-          final requirements = ctx.read(_requirementsFile);
+        buildReviewerPrompt:
+            (
+              String originalTask,
+              FileContext ctx,
+              int iteration,
+              AgentResult producerResult,
+            ) async {
+              final design = ctx.read(_designFile);
+              final requirements = ctx.read(_requirementsFile);
 
-          return 'Review the following Dart implementation against the '
-              'requirements and design document.\n\n'
-              '## Requirements\n\n$requirements\n\n'
-              '## Design Document\n\n$design\n\n'
-              '## Implementation (iteration $iteration)\n\n'
-              '```dart\n${producerResult.output}\n```\n\n'
-              'If the code meets all criteria, begin your response with '
-              '"$_approvalMarker". Otherwise, list the issues.';
-        },
+              return 'Review the following Dart implementation against the '
+                  'requirements and design document.\n\n'
+                  '## Requirements\n\n$requirements\n\n'
+                  '## Design Document\n\n$design\n\n'
+                  '## Implementation (iteration $iteration)\n\n'
+                  '```dart\n${producerResult.output}\n```\n\n'
+                  'If the code meets all criteria, begin your response with '
+                  '"$_approvalMarker". Otherwise, list the issues.';
+            },
       ),
 
       // ── Stage 4: Documentation (AgentStep.dynamic, conditional) ────────
@@ -472,10 +482,7 @@ void _persistLoopStatus(FileContext context, OrchestratorResult result) {
       context.write(_implementationFile, stepResult.output);
 
       // Write the acceptance flag for conditional stages.
-      context.write(
-        _implementationStatusFile,
-        stepResult.accepted.toString(),
-      );
+      context.write(_implementationStatusFile, stepResult.accepted.toString());
       return;
     }
   }
@@ -510,8 +517,10 @@ void _printReport(OrchestratorResult result) {
         // Per-iteration token breakdown.
         final loopResult = stepResult.agentLoopResult;
         for (final iter in loopResult.iterations) {
-          print('    [${iter.index}] producer=${iter.producerResult.tokensUsed}'
-              ', reviewer=${iter.reviewerResult.tokensUsed} tokens');
+          print(
+            '    [${iter.index}] producer=${iter.producerResult.tokensUsed}'
+            ', reviewer=${iter.reviewerResult.tokensUsed} tokens',
+          );
         }
     }
 
@@ -521,8 +530,10 @@ void _printReport(OrchestratorResult result) {
   }
 
   // ── Aggregate token usage ───────────────────────────────────────────────
-  final totalTokens =
-      result.stepResults.fold<int>(0, (sum, r) => sum + r.tokensUsed);
+  final totalTokens = result.stepResults.fold<int>(
+    0,
+    (sum, r) => sum + r.tokensUsed,
+  );
   print('Total tokens: $totalTokens');
 
   // ── Errors ──────────────────────────────────────────────────────────────
@@ -610,7 +621,8 @@ Future<void> main() async {
     // ── Phase 2: Run stages 4-5 (conditional) ────────────────────────────
     _printHeader('Phase 2: Stages 4-5 (conditional)');
 
-    final accepted = context.exists(_implementationStatusFile) &&
+    final accepted =
+        context.exists(_implementationStatusFile) &&
         context.read(_implementationStatusFile) == 'true';
     print('Implementation accepted: $accepted');
 
@@ -626,10 +638,7 @@ Future<void> main() async {
 
       // Combine results for the full report.
       final combinedResult = OrchestratorResult(
-        stepResults: [
-          ...phase1Result.stepResults,
-          ...phase2Result.stepResults,
-        ],
+        stepResults: [...phase1Result.stepResults, ...phase2Result.stepResults],
         duration: phase1Result.duration + phase2Result.duration,
         errors: [...phase1Result.errors, ...phase2Result.errors],
       );

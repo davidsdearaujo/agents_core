@@ -1,4 +1,5 @@
 import '../models/tool_call.dart';
+import 'agent_stop_reason.dart';
 
 /// The outcome of an [Agent.run] invocation.
 ///
@@ -25,9 +26,10 @@ class AgentResult {
   /// [filesModified] lists workspace-relative paths of files written or
   /// changed during the run. Defaults to an empty list.
   ///
-  /// [stoppedReason] is the finish reason reported by the model (e.g.
-  /// `"stop"`, `"length"`, `"tool_calls"`). May be `null` if the server
-  /// did not provide one.
+  /// [stoppedReason] indicates why the agent stopped (e.g.
+  /// [AgentStopReason.completed], [AgentStopReason.maxIterations]).
+  /// May be `null` for single-round agents that do not run an
+  /// orchestration loop.
   const AgentResult({
     required this.output,
     this.toolCallsMade = const [],
@@ -60,13 +62,15 @@ class AgentResult {
   /// operations. Empty by default.
   final List<String> filesModified;
 
-  /// The finish reason reported by the model for the final generation.
+  /// The reason the agent stopped.
   ///
-  /// Common values: `"stop"` (natural end), `"length"` (token limit hit),
-  /// `"tool_calls"` (model requested tool invocations).
+  /// For [ReActAgent] runs one of [AgentStopReason.completed],
+  /// [AgentStopReason.maxIterations], [AgentStopReason.maxTotalTokens],
+  /// [AgentStopReason.terminalTool], or [AgentStopReason.loopDetected].
   ///
-  /// May be `null` if the server did not report a reason.
-  final String? stoppedReason;
+  /// `null` for single-round agents (e.g. [SimpleAgent]) that do not
+  /// manage an orchestration loop.
+  final AgentStopReason? stoppedReason;
 
   @override
   String toString() =>

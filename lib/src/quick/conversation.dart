@@ -1,7 +1,4 @@
-import '../client/lm_studio_client.dart';
-import '../config/agents_core_config.dart';
-import '../models/chat_completion_request.dart';
-import '../models/chat_message.dart';
+import 'package:agents_core/agents_core.dart';
 
 const _defaultModel = 'lmstudio-community/default';
 
@@ -30,8 +27,8 @@ class Conversation {
     required AgentsCoreConfig config,
     String? model,
     String? systemPrompt,
-  })  : _client = LmStudioClient(config),
-        _model = model ?? _defaultModel {
+  }) : _client = LmStudioClient(config),
+       _model = model ?? _defaultModel {
     if (systemPrompt != null) {
       _history.add(
         ChatMessage(role: ChatMessageRole.system, content: systemPrompt),
@@ -39,7 +36,7 @@ class Conversation {
     }
   }
 
-  final LmStudioClient _client;
+  final LlmClient _client;
   final String _model;
   final List<ChatMessage> _history = [];
 
@@ -97,10 +94,7 @@ class Conversation {
       yield delta;
     }
     _history.add(
-      ChatMessage(
-        role: ChatMessageRole.assistant,
-        content: buffer.toString(),
-      ),
+      ChatMessage(role: ChatMessageRole.assistant, content: buffer.toString()),
     );
   }
 
@@ -111,8 +105,10 @@ class Conversation {
   /// If a `system` message already exists at index 0, it is replaced.
   /// Otherwise the new message is inserted at position 0.
   void setSystemPrompt(String prompt) {
-    final systemMsg =
-        ChatMessage(role: ChatMessageRole.system, content: prompt);
+    final systemMsg = ChatMessage(
+      role: ChatMessageRole.system,
+      content: prompt,
+    );
     if (_history.isNotEmpty && _history.first.role == ChatMessageRole.system) {
       _history[0] = systemMsg;
     } else {

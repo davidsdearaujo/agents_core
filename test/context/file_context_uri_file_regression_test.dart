@@ -68,15 +68,21 @@ void main() {
     test('file with spaces physically exists at correct path (no %20)', () {
       ctx.write('research outline.md', '# Research');
       final file = File('${dir.path}/research outline.md');
-      expect(file.existsSync(), isTrue,
-          reason: 'File should exist with real spaces, not percent-encoded');
+      expect(
+        file.existsSync(),
+        isTrue,
+        reason: 'File should exist with real spaces, not percent-encoded',
+      );
     });
 
     test('no percent-encoded file is created for spaced filename', () {
       ctx.write('my notes.txt', 'data');
       final percentFile = File('${dir.path}/my%20notes.txt');
-      expect(percentFile.existsSync(), isFalse,
-          reason: 'No file with %20 should be created — this was the bug');
+      expect(
+        percentFile.existsSync(),
+        isFalse,
+        reason: 'No file with %20 should be created — this was the bug',
+      );
     });
 
     test('exists() returns true for file with spaces', () {
@@ -105,8 +111,11 @@ void main() {
     test('listFiles() does NOT return percent-encoded filename', () {
       ctx.write('my notes.txt', 'data');
       final files = ctx.listFiles();
-      expect(files, isNot(contains('my%20notes.txt')),
-          reason: 'Listed filename should have real spaces, not %20');
+      expect(
+        files,
+        isNot(contains('my%20notes.txt')),
+        reason: 'Listed filename should have real spaces, not %20',
+      );
       expect(files, contains('my notes.txt'));
     });
 
@@ -142,15 +151,21 @@ void main() {
     test('directory with spaces physically exists (no %20)', () {
       ctx.write('project notes/file.txt', 'data');
       final directory = Directory('${dir.path}/project notes');
-      expect(directory.existsSync(), isTrue,
-          reason: 'Directory should have real spaces');
+      expect(
+        directory.existsSync(),
+        isTrue,
+        reason: 'Directory should have real spaces',
+      );
     });
 
     test('no percent-encoded directory is created', () {
       ctx.write('my folder/file.txt', 'data');
       final percentDir = Directory('${dir.path}/my%20folder');
-      expect(percentDir.existsSync(), isFalse,
-          reason: 'No directory with %20 should be created');
+      expect(
+        percentDir.existsSync(),
+        isFalse,
+        reason: 'No directory with %20 should be created',
+      );
     });
 
     test('deeply nested directories with spaces at all levels', () {
@@ -161,17 +176,19 @@ void main() {
       );
     });
 
-    test('deeply nested directory path physically exists (no %20 anywhere)',
-        () {
-      ctx.write('parent dir/child dir/file.txt', 'data');
-      final parentDir = Directory('${dir.path}/parent dir');
-      final childDir = Directory('${dir.path}/parent dir/child dir');
-      expect(parentDir.existsSync(), isTrue);
-      expect(childDir.existsSync(), isTrue);
+    test(
+      'deeply nested directory path physically exists (no %20 anywhere)',
+      () {
+        ctx.write('parent dir/child dir/file.txt', 'data');
+        final parentDir = Directory('${dir.path}/parent dir');
+        final childDir = Directory('${dir.path}/parent dir/child dir');
+        expect(parentDir.existsSync(), isTrue);
+        expect(childDir.existsSync(), isTrue);
 
-      // Verify no percent-encoded versions exist
-      expect(Directory('${dir.path}/parent%20dir').existsSync(), isFalse);
-    });
+        // Verify no percent-encoded versions exist
+        expect(Directory('${dir.path}/parent%20dir').existsSync(), isFalse);
+      },
+    );
 
     test('mixed: spaces in both directory and filename', () {
       ctx.write('my project/research notes.md', '# Notes');
@@ -199,8 +216,7 @@ void main() {
   // ---------------------------------------------------------------------------
   // Group 3: Special characters that Uri.parse would percent-encode
   // ---------------------------------------------------------------------------
-  group(
-      'FileContext Uri.file regression — special characters '
+  group('FileContext Uri.file regression — special characters '
       '(hash, plus, percent)', () {
     late FileContext ctx;
     late Directory dir;
@@ -301,12 +317,14 @@ void main() {
       );
     });
 
-    test('legitimate path with spaces + ".." that stays in workspace is OK',
-        () {
-      // 'a b/../c d.txt' resolves to 'c d.txt' inside workspace — allowed
-      expect(() => ctx.write('a b/../c d.txt', 'ok'), returnsNormally);
-      expect(ctx.exists('c d.txt'), isTrue);
-    });
+    test(
+      'legitimate path with spaces + ".." that stays in workspace is OK',
+      () {
+        // 'a b/../c d.txt' resolves to 'c d.txt' inside workspace — allowed
+        expect(() => ctx.write('a b/../c d.txt', 'ok'), returnsNormally);
+        expect(ctx.exists('c d.txt'), isTrue);
+      },
+    );
   });
 
   // ---------------------------------------------------------------------------
@@ -314,8 +332,9 @@ void main() {
   // ---------------------------------------------------------------------------
   group('FileContext Uri.file regression — workspace path with spaces', () {
     test('workspace path with spaces works for all operations', () {
-      final spacedDir = Directory.systemTemp
-          .createTempSync('agents core workspace ');
+      final spacedDir = Directory.systemTemp.createTempSync(
+        'agents core workspace ',
+      );
       addTearDown(() => spacedDir.deleteSync(recursive: true));
 
       final ctx = FileContext(workspacePath: spacedDir.path);
@@ -327,7 +346,10 @@ void main() {
 
       // append
       ctx.append('notes.txt', '\nmore');
-      expect(ctx.read('notes.txt'), equals('hello from spaced workspace\nmore'));
+      expect(
+        ctx.read('notes.txt'),
+        equals('hello from spaced workspace\nmore'),
+      );
 
       // listFiles
       expect(ctx.listFiles(), contains('notes.txt'));
@@ -338,8 +360,9 @@ void main() {
     });
 
     test('workspace path with spaces + file with spaces', () {
-      final spacedDir = Directory.systemTemp
-          .createTempSync('agents spaced workspace ');
+      final spacedDir = Directory.systemTemp.createTempSync(
+        'agents spaced workspace ',
+      );
       addTearDown(() => spacedDir.deleteSync(recursive: true));
 
       final ctx = FileContext(workspacePath: spacedDir.path);
@@ -353,8 +376,9 @@ void main() {
     });
 
     test('workspace path with spaces still blocks traversal', () {
-      final spacedDir = Directory.systemTemp
-          .createTempSync('agents secure workspace ');
+      final spacedDir = Directory.systemTemp.createTempSync(
+        'agents secure workspace ',
+      );
       addTearDown(() => spacedDir.deleteSync(recursive: true));
 
       final ctx = FileContext(workspacePath: spacedDir.path);
@@ -395,16 +419,25 @@ void main() {
       }
 
       for (final entry in files.entries) {
-        expect(ctx.read(entry.key), equals(entry.value),
-            reason: '"${entry.key}" should round-trip correctly');
-        expect(ctx.exists(entry.key), isTrue,
-            reason: '"${entry.key}" should exist');
+        expect(
+          ctx.read(entry.key),
+          equals(entry.value),
+          reason: '"${entry.key}" should round-trip correctly',
+        );
+        expect(
+          ctx.exists(entry.key),
+          isTrue,
+          reason: '"${entry.key}" should exist',
+        );
       }
 
       final listed = ctx.listFiles();
       for (final name in files.keys) {
-        expect(listed, contains(name),
-            reason: '"$name" should appear in listFiles()');
+        expect(
+          listed,
+          contains(name),
+          reason: '"$name" should appear in listFiles()',
+        );
       }
     });
 
@@ -415,8 +448,7 @@ void main() {
 
       // Only one file should exist
       final listed = ctx.listFiles();
-      final matches =
-          listed.where((f) => f.contains('document')).toList();
+      final matches = listed.where((f) => f.contains('document')).toList();
       expect(matches, hasLength(1));
       expect(matches.first, equals('document draft.txt'));
     });

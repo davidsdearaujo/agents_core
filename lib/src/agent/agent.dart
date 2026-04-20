@@ -1,4 +1,4 @@
-import '../client/lm_studio_client.dart';
+import '../client/llm_client.dart';
 import '../config/agents_core_config.dart';
 import '../context/file_context.dart';
 import '../models/tool_definition.dart';
@@ -55,11 +55,11 @@ abstract class Agent {
   /// Used in log messages and orchestration metadata (e.g. task assignments).
   final String name;
 
-  /// The LM Studio client used for chat completion requests.
+  /// The LLM client used for chat completion requests.
   ///
   /// The agent does **not** own this client — the caller is responsible for
-  /// calling [LmStudioClient.dispose] when done.
-  final LmStudioClient client;
+  /// calling [LlmClient.dispose] when done.
+  final LlmClient client;
 
   /// Cross-cutting configuration (logger, timeouts, base URL).
   final AgentsCoreConfig config;

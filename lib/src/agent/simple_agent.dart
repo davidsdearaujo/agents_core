@@ -66,8 +66,10 @@ class SimpleAgent extends Agent {
   /// Throws [LmStudioHttpException] if the response status is not 2xx.
   @override
   Future<AgentResult> run(String task, {FileContext? context}) async {
-    config.logger.info('[$name] Running task: '
-        '${task.length > 60 ? '${task.substring(0, 60)}...' : task}');
+    config.logger.info(
+      '[$name] Running task: '
+      '${task.length > 60 ? '${task.substring(0, 60)}...' : task}',
+    );
 
     final messages = _buildMessages(task);
 
@@ -77,24 +79,30 @@ class SimpleAgent extends Agent {
       tools: tools.isNotEmpty ? tools : null,
     );
 
-    config.logger.debug('[$name] Sending chat completion: '
-        'model=${request.model}, '
-        'messages=${messages.length}, '
-        'tools=${tools.length}');
+    config.logger.debug(
+      '[$name] Sending chat completion: '
+      'model=${request.model}, '
+      'messages=${messages.length}, '
+      'tools=${tools.length}',
+    );
 
     final response = await client.chatCompletion(request);
     final choice = response.choices.first;
     final message = choice.message;
 
-    config.logger.debug('[$name] Received response: '
-        'tokens=${response.usage.totalTokens}, '
-        'finishReason=${choice.finishReason}');
+    config.logger.debug(
+      '[$name] Received response: '
+      'tokens=${response.usage.totalTokens}, '
+      'finishReason=${choice.finishReason}',
+    );
 
     return AgentResult(
       output: message.content ?? '',
       toolCallsMade: message.toolCalls ?? const [],
       tokensUsed: response.usage.totalTokens,
-      stoppedReason: choice.finishReason,
+      // SimpleAgent does not track stop reason; ReActAgent handles that.
+      // choice.finishReason is a raw OpenAI String — not assignable to AgentStopReason.
+      stoppedReason: null,
     );
   }
 

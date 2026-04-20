@@ -17,8 +17,7 @@ class ChatCompletionChoice {
   /// Reads `message` and `finish_reason`; ignores `index` and other fields.
   factory ChatCompletionChoice.fromJson(Map<String, dynamic> json) {
     return ChatCompletionChoice(
-      message:
-          ChatMessage.fromJson(json['message'] as Map<String, dynamic>),
+      message: ChatMessage.fromJson(json['message'] as Map<String, dynamic>),
       finishReason: json['finish_reason'] as String?,
     );
   }
@@ -34,9 +33,9 @@ class ChatCompletionChoice {
 
   /// Serializes this choice to a JSON-compatible map.
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'message': message.toJson(),
-        'finish_reason': finishReason,
-      };
+    'message': message.toJson(),
+    'finish_reason': finishReason,
+  };
 }
 
 /// The response from `POST /v1/chat/completions` (non-streaming).
@@ -63,11 +62,9 @@ class ChatCompletionResponse {
     return ChatCompletionResponse(
       id: json['id'] as String,
       choices: rawChoices
-          .map((c) =>
-              ChatCompletionChoice.fromJson(c as Map<String, dynamic>))
+          .map((c) => ChatCompletionChoice.fromJson(c as Map<String, dynamic>))
           .toList(),
-      usage:
-          CompletionUsage.fromJson(json['usage'] as Map<String, dynamic>),
+      usage: CompletionUsage.fromJson(json['usage'] as Map<String, dynamic>),
     );
   }
 
@@ -82,8 +79,8 @@ class ChatCompletionResponse {
 
   /// Serializes this response to a JSON-compatible map.
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'choices': choices.map((c) => c.toJson()).toList(),
-        'usage': usage.toJson(),
-      };
+    'id': id,
+    'choices': choices.map((c) => c.toJson()).toList(),
+    'usage': usage.toJson(),
+  };
 }

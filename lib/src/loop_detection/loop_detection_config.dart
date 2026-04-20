@@ -72,10 +72,10 @@ class LoopDetectionConfig {
 
   @override
   int get hashCode => Object.hash(
-        maxConsecutiveIdenticalToolCalls,
-        maxConsecutiveIdenticalOutputs,
-        similarityThreshold,
-      );
+    maxConsecutiveIdenticalToolCalls,
+    maxConsecutiveIdenticalOutputs,
+    similarityThreshold,
+  );
 
   @override
   String toString() =>
